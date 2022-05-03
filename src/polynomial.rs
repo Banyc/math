@@ -32,11 +32,11 @@ impl Polynomial {
     }
 
     pub fn zero() -> Polynomial {
-        let this = Polynomial {
-            coefficients: vec![],
-        };
-        this.check_rep();
-        this
+        Polynomial::new(vec![])
+    }
+    
+    pub fn one() -> Polynomial {
+        Polynomial::new(vec![1.0])
     }
 
     /// find f(x) given
@@ -58,7 +58,7 @@ impl Polynomial {
         for i in 0..points.len() {
             let xi = points[i].x;
             let yi = points[i].y;
-            let mut prod = Polynomial::new(vec![1.0]);
+            let mut prod = Polynomial::one();
             for j in 0..points.len() {
                 if j == i {
                     continue;
@@ -94,6 +94,10 @@ impl Polynomial {
 
     pub fn is_zero(&self) -> bool {
         self.coefficients.len() == 0
+    }
+
+    pub fn coefficients(&self) -> &Vec<f64> {
+        &self.coefficients
     }
 }
 

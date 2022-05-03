@@ -16,12 +16,14 @@ pub struct Point {
     pub y: f64,
 }
 
-const FLOAT_RELATIVE_ERROR: f64 = 10e-9;
+const FLOAT_RELATIVE_TOLERANCE: f64 = 1e-9; // for big absolute numbers
+const FLOAT_ABSOLUTE_TOLERANCE: f64 = 1e-9; // for near-zero numbers
 
 impl Polynomial {
     fn check_rep(&self) {
         if self.coefficients.len() > 0 {
-            assert!(self.coefficients[self.coefficients.len() - 1] != 0.0);
+            let last = self.coefficients[self.coefficients.len() - 1];
+            assert!(!is_close(last, 0.0));
         }
         for &coeff in &self.coefficients {
             assert!(!coeff.is_nan());
@@ -29,8 +31,15 @@ impl Polynomial {
     }
 
     pub fn new(mut coefficients: Vec<f64>) -> Polynomial {
-        while coefficients.len() > 0 && coefficients[coefficients.len() - 1] == 0.0 {
-            coefficients.pop().unwrap();
+        loop {
+            if coefficients.len() > 0 {
+                let last = coefficients[coefficients.len() - 1];
+                if is_close(last, 0.0) {
+                    coefficients.pop().unwrap();
+                    continue;
+                }
+            }
+            break;
         }
         let this = Polynomial { coefficients };
         this.check_rep();
@@ -56,7 +65,7 @@ impl Polynomial {
                 if i == j {
                     continue;
                 }
-                assert!(!are_floats_equal(points[i].x, points[j].x));
+                assert!(!is_close(points[i].x, points[j].x));
             }
         }
 
@@ -184,7 +193,7 @@ impl PartialEq<Polynomial> for Polynomial {
             return false;
         }
         for i in 0..self.coefficients.len() {
-            if !are_floats_equal(self.coefficients[i], other.coefficients[i]) {
+            if !is_close(self.coefficients[i], other.coefficients[i]) {
                 return false;
             }
         }
@@ -213,16 +222,22 @@ impl Display for Polynomial {
     }
 }
 
-fn are_floats_equal(a: f64, b: f64) -> bool {
+/// reference: <https://stackoverflow.com/a/33024979/9920172>
+fn is_close(a: f64, b: f64) -> bool {
     let diff = a - b;
-    let abs_err = diff.abs();
-    let relative_err_a = abs_err / a.abs();
-    let relative_err_b = abs_err / b.abs();
-    if relative_err_a < FLOAT_RELATIVE_ERROR && relative_err_b < FLOAT_RELATIVE_ERROR {
-        true
-    } else {
-        false
+    let tolerance = max_float(
+        FLOAT_RELATIVE_TOLERANCE * max_float(a.abs(), b.abs()),
+        FLOAT_ABSOLUTE_TOLERANCE,
+    );
+    diff.abs() <= tolerance
+}
+
+fn max_float(a: f64, b: f64) -> f64 {
+    let mut max = a;
+    if b > max {
+        max = b;
     }
+    max
 }
 
 #[cfg(test)]
@@ -267,6 +282,7 @@ mod tests {
         let sum = &lhs + &rhs;
         assert_eq!(sum.coefficients, vec![2.0, -1.0, 3.0]);
     }
+
     #[test]
     fn test_polynomial_mul() {
         let lhs = Polynomial::zero();
@@ -309,5 +325,18 @@ mod tests {
             ys
         };
         assert_eq!(ys, vec![1.0, 3.999999999999999, 8.99999999999999])
+    }
+
+    #[test]
+    fn test_trimming_zero_coefficients() {
+        let points = vec![
+            Point { x: 1.0, y: 1.0 },
+            Point { x: 2.0, y: 4.0 },
+            Point { x: 7.0, y: 9.0 },
+        ];
+        let p = Polynomial::interpolate(&points);
+        let p2 = Polynomial::new(vec![0.0, 0.0, 1.0 / 3.0]);
+        let p = &p + &p2;
+        assert!(p.coefficients.len() == 2);
     }
 }

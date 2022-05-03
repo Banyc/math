@@ -5,6 +5,7 @@ pub enum Error {
     Undefined,
 }
 
+#[derive(Debug)]
 pub struct Polynomial {
     coefficients: Vec<f64>, // from low-order to high-order
 }
@@ -15,10 +16,15 @@ pub struct Point {
     pub y: f64,
 }
 
+const FLOAT_RELATIVE_ERROR: f64 = 10e-9;
+
 impl Polynomial {
     fn check_rep(&self) {
         if self.coefficients.len() > 0 {
             assert!(self.coefficients[self.coefficients.len() - 1] != 0.0);
+        }
+        for &coeff in &self.coefficients {
+            assert!(!coeff.is_nan());
         }
     }
 
@@ -34,7 +40,7 @@ impl Polynomial {
     pub fn zero() -> Polynomial {
         Polynomial::new(vec![])
     }
-    
+
     pub fn one() -> Polynomial {
         Polynomial::new(vec![1.0])
     }
@@ -50,7 +56,7 @@ impl Polynomial {
                 if i == j {
                     continue;
                 }
-                assert!(points[i].x - points[j].x != 0.0);
+                assert!(!are_floats_equal(points[i].x, points[j].x));
             }
         }
 
@@ -172,6 +178,20 @@ impl<'a, 'b> ops::Mul<&'b Polynomial> for &'a Polynomial {
     }
 }
 
+impl PartialEq<Polynomial> for Polynomial {
+    fn eq(&self, other: &Polynomial) -> bool {
+        if self.coefficients.len() != other.coefficients.len() {
+            return false;
+        }
+        for i in 0..self.coefficients.len() {
+            if !are_floats_equal(self.coefficients[i], other.coefficients[i]) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl Display for Polynomial {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut output = String::new();
@@ -190,6 +210,18 @@ impl Display for Polynomial {
             }
         }
         write!(f, "{}", output)
+    }
+}
+
+fn are_floats_equal(a: f64, b: f64) -> bool {
+    let diff = a - b;
+    let abs_err = diff.abs();
+    let relative_err_a = abs_err / a.abs();
+    let relative_err_b = abs_err / b.abs();
+    if relative_err_a < FLOAT_RELATIVE_ERROR && relative_err_b < FLOAT_RELATIVE_ERROR {
+        true
+    } else {
+        false
     }
 }
 
@@ -268,6 +300,7 @@ mod tests {
             p.coefficients,
             vec![-2.666666666666666, 3.9999999999999996, -0.3333333333333334]
         );
+        assert_eq!(p, Polynomial::new(vec![-8.0 / 3.0, 4.0, -1.0 / 3.0]));
         let ys = {
             let mut ys = Vec::new();
             for point in &points {

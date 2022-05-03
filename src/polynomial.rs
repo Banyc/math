@@ -1,5 +1,6 @@
 use std::{fmt::Display, ops};
 
+#[derive(Debug)]
 pub enum Error {
     Undefined,
 }
@@ -8,6 +9,7 @@ pub struct Polynomial {
     coefficients: Vec<f64>, // from low-order to high-order
 }
 
+#[derive(Debug)]
 pub struct Point {
     x: f64,
     y: f64,

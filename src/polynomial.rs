@@ -91,12 +91,15 @@ impl Polynomial {
     }
 
     // f: R -> R
-    pub fn evaluate(&self, x: f64) -> f64 {
-        let mut result = 0.0;
-        for (i, coeff) in self.coefficients.iter().enumerate() {
-            result += coeff * x.powi(i as i32);
+    pub fn evaluate_at(&self, x: f64) -> f64 {
+        // Uses Horner's method, first discovered by Persian mathematician
+        // Sharaf al-Dīn al-Ṭūsī, which evaluates a polynomial by minimizing
+        // the number of multiplications.
+        let mut sum = 0.0;
+        for &coeff in self.coefficients.iter().rev() {
+            sum = x * sum + coeff;
         }
-        result
+        sum
     }
 
     pub fn degree(&self) -> Result<usize, Error> {
@@ -247,9 +250,9 @@ mod tests {
     #[test]
     fn test_polynomial_evaluation() {
         let p = Polynomial::new(vec![1.0, 2.0, 3.0]);
-        assert_eq!(p.evaluate(0.0), 1.0);
-        assert_eq!(p.evaluate(1.0), 6.0);
-        assert_eq!(p.evaluate(2.0), 17.0);
+        assert_eq!(p.evaluate_at(0.0), 1.0);
+        assert_eq!(p.evaluate_at(1.0), 6.0);
+        assert_eq!(p.evaluate_at(2.0), 17.0);
     }
 
     #[test]
@@ -312,19 +315,17 @@ mod tests {
             Point { x: 7.0, y: 9.0 },
         ];
         let p = Polynomial::interpolate(&points);
-        assert_eq!(
-            p.coefficients,
-            vec![-2.666666666666666, 3.9999999999999996, -0.3333333333333334]
-        );
         assert_eq!(p, Polynomial::new(vec![-8.0 / 3.0, 4.0, -1.0 / 3.0]));
         let ys = {
             let mut ys = Vec::new();
             for point in &points {
-                ys.push(p.evaluate(point.x));
+                ys.push(p.evaluate_at(point.x));
             }
             ys
         };
-        assert_eq!(ys, vec![1.0, 3.999999999999999, 8.99999999999999])
+        assert!(is_close(ys[0], 1.0));
+        assert!(is_close(ys[1], 4.0));
+        assert!(is_close(ys[2], 9.0));
     }
 
     #[test]

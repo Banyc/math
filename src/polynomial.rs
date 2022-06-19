@@ -1,3 +1,4 @@
+use crate::float_ext::FloatExt;
 use std::{fmt::Display, ops};
 
 #[derive(Debug)]
@@ -16,14 +17,11 @@ pub struct Point {
     pub y: f64,
 }
 
-const FLOAT_RELATIVE_TOLERANCE: f64 = 1e-9; // for big absolute numbers
-const FLOAT_ABSOLUTE_TOLERANCE: f64 = 1e-9; // for near-zero numbers
-
 impl Polynomial {
     fn check_rep(&self) {
         if self.coefficients.len() > 0 {
             let last = self.coefficients[self.coefficients.len() - 1];
-            assert!(!is_close(last, 0.0));
+            assert!(!last.is_close_to(0.0));
         }
         for &coeff in &self.coefficients {
             assert!(!coeff.is_nan());
@@ -34,7 +32,7 @@ impl Polynomial {
         loop {
             if coefficients.len() > 0 {
                 let last = coefficients[coefficients.len() - 1];
-                if is_close(last, 0.0) {
+                if last.is_close_to(0.0) {
                     coefficients.pop().unwrap();
                     continue;
                 }
@@ -65,7 +63,7 @@ impl Polynomial {
                 if i == j {
                     continue;
                 }
-                assert!(!is_close(points[i].x, points[j].x));
+                assert!(!points[i].x.is_close_to(points[j].x));
             }
         }
 
@@ -196,7 +194,7 @@ impl PartialEq<Polynomial> for Polynomial {
             return false;
         }
         for i in 0..self.coefficients.len() {
-            if !is_close(self.coefficients[i], other.coefficients[i]) {
+            if !self.coefficients[i].is_close_to(other.coefficients[i]) {
                 return false;
             }
         }
@@ -225,26 +223,10 @@ impl Display for Polynomial {
     }
 }
 
-/// reference: <https://stackoverflow.com/a/33024979/9920172>
-fn is_close(a: f64, b: f64) -> bool {
-    let diff = a - b;
-    let tolerance = max_float(
-        FLOAT_RELATIVE_TOLERANCE * max_float(a.abs(), b.abs()),
-        FLOAT_ABSOLUTE_TOLERANCE,
-    );
-    diff.abs() <= tolerance
-}
-
-fn max_float(a: f64, b: f64) -> f64 {
-    let mut max = a;
-    if b > max {
-        max = b;
-    }
-    max
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::float_ext::FloatExt;
+
     use super::*;
 
     #[test]
@@ -323,9 +305,9 @@ mod tests {
             }
             ys
         };
-        assert!(is_close(ys[0], 1.0));
-        assert!(is_close(ys[1], 4.0));
-        assert!(is_close(ys[2], 9.0));
+        assert!(ys[0].is_close_to(1.0));
+        assert!(ys[1].is_close_to(4.0));
+        assert!(ys[2].is_close_to(9.0));
     }
 
     #[test]

@@ -1,17 +1,20 @@
+use thiserror::Error;
+
 use crate::float_ext::FloatExt;
 use std::{fmt::Display, ops};
 
-#[derive(Debug)]
+#[derive(Debug, Error, Clone, Copy)]
 pub enum Error {
+    #[error("Undefined")]
     Undefined,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Polynomial {
     coefficients: Vec<f64>, // from low-order to high-order
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Point {
     pub x: f64,
     pub y: f64,
@@ -19,20 +22,20 @@ pub struct Point {
 
 impl Polynomial {
     fn check_rep(&self) {
-        if self.coefficients.len() > 0 {
+        if !self.coefficients.is_empty() {
             let last = self.coefficients[self.coefficients.len() - 1];
-            assert!(!last.is_close_to(0.0));
+            assert!(!last.closes_to(0.0));
         }
-        for &coeff in &self.coefficients {
+        for coeff in &self.coefficients {
             assert!(!coeff.is_nan());
         }
     }
 
     pub fn new(mut coefficients: Vec<f64>) -> Polynomial {
         loop {
-            if coefficients.len() > 0 {
+            if !coefficients.is_empty() {
                 let last = coefficients[coefficients.len() - 1];
-                if last.is_close_to(0.0) {
+                if last.closes_to(0.0) {
                     coefficients.pop().unwrap();
                     continue;
                 }
@@ -55,28 +58,28 @@ impl Polynomial {
     /// find f(x) given
     ///
     /// $$ f(x) = \sum_{i=1}^n y_i \cdot (\prod_{j \ne i} \frac{x - x_j}{x_i - x_j}) $$
-    pub fn interpolate(points: &Vec<Point>) -> Polynomial {
-        assert!(points.len() != 0);
+    pub fn interpolate(points: &[Point]) -> Polynomial {
+        assert!(!points.is_empty());
         // make sure $x_i$ is distinct
         for i in 0..points.len() {
             for j in 0..points.len() {
                 if i == j {
                     continue;
                 }
-                assert!(!points[i].x.is_close_to(points[j].x));
+                assert!(!points[i].x.closes_to(points[j].x));
             }
         }
 
         let mut sum = Polynomial::zero();
-        for i in 0..points.len() {
-            let xi = points[i].x;
-            let yi = points[i].y;
+        for (i, p_i) in points.iter().enumerate() {
+            let xi = p_i.x;
+            let yi = p_i.y;
             let mut prod = Polynomial::one();
-            for j in 0..points.len() {
+            for (j, p_j) in points.iter().enumerate() {
                 if j == i {
                     continue;
                 }
-                let xj = points[j].x;
+                let xj = p_j.x;
                 let a0 = -xj / (xi - xj);
                 let a1 = 1.0 / (xi - xj);
                 let base = Polynomial::new(vec![a0, a1]);
@@ -101,7 +104,7 @@ impl Polynomial {
     }
 
     pub fn degree(&self) -> Result<usize, Error> {
-        if self.coefficients.len() == 0 {
+        if self.coefficients.is_empty() {
             Err(Error::Undefined)
         } else {
             Ok(self.coefficients.len() - 1)
@@ -109,7 +112,7 @@ impl Polynomial {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.coefficients.len() == 0
+        self.coefficients.is_empty()
     }
 
     pub fn coefficients(&self) -> &Vec<f64> {
@@ -129,13 +132,13 @@ impl<'a, 'b> ops::Add<&'b Polynomial> for &'a Polynomial {
             max_len
         };
         let mut coeffs = vec![0.0; len];
-        for i in 0..coeffs.len() {
+        for (i, coeff) in coeffs.iter_mut().enumerate() {
             if self.coefficients.len() > i && rhs.coefficients.len() > i {
-                coeffs[i] = self.coefficients[i] + rhs.coefficients[i];
+                *coeff = self.coefficients[i] + rhs.coefficients[i];
             } else if self.coefficients.len() > i {
-                coeffs[i] = self.coefficients[i];
+                *coeff = self.coefficients[i];
             } else if rhs.coefficients.len() > i {
-                coeffs[i] = rhs.coefficients[i];
+                *coeff = rhs.coefficients[i];
             } else {
                 panic!();
             }
@@ -156,13 +159,13 @@ impl<'a, 'b> ops::Sub<&'b Polynomial> for &'a Polynomial {
             max_len
         };
         let mut coeffs = vec![0.0; len];
-        for i in 0..coeffs.len() {
+        for (i, coeff) in coeffs.iter_mut().enumerate() {
             if self.coefficients.len() > i && rhs.coefficients.len() > i {
-                coeffs[i] = self.coefficients[i] - rhs.coefficients[i];
+                *coeff = self.coefficients[i] - rhs.coefficients[i];
             } else if self.coefficients.len() > i {
-                coeffs[i] = self.coefficients[i];
+                *coeff = self.coefficients[i];
             } else if rhs.coefficients.len() > i {
-                coeffs[i] = -rhs.coefficients[i];
+                *coeff = -rhs.coefficients[i];
             } else {
                 panic!();
             }
@@ -194,7 +197,7 @@ impl PartialEq<Polynomial> for Polynomial {
             return false;
         }
         for i in 0..self.coefficients.len() {
-            if !self.coefficients[i].is_close_to(other.coefficients[i]) {
+            if !self.coefficients[i].closes_to(other.coefficients[i]) {
                 return false;
             }
         }
@@ -305,9 +308,9 @@ mod tests {
             }
             ys
         };
-        assert!(ys[0].is_close_to(1.0));
-        assert!(ys[1].is_close_to(4.0));
-        assert!(ys[2].is_close_to(9.0));
+        assert!(ys[0].closes_to(1.0));
+        assert!(ys[1].closes_to(4.0));
+        assert!(ys[2].closes_to(9.0));
     }
 
     #[test]

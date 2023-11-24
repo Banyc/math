@@ -104,8 +104,8 @@ where
 {
     fn mean(self) -> f64 {
         let n: usize = self.clone().count();
-        let sum: f64 = self.sum();
-        sum / n as f64
+        // Sum of fractions is used to avoid infinite value
+        self.map(|x| x / n as f64).sum()
     }
 }
 

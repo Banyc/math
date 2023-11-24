@@ -1,3 +1,5 @@
+use crate::float_ext::FloatExt;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Probability(f64);
 
@@ -48,8 +50,35 @@ impl PartialOrd for Probability {
     }
 }
 
+pub trait WeightedSumExt: Iterator<Item = (Probability, f64)> {
+    fn weighted_sum(self) -> Option<f64>
+    where
+        Self: Sized,
+    {
+        let mut prob_sum = 0.0;
+
+        let weighted_sum = self
+            .map(|(p, x)| {
+                prob_sum += p.get();
+                p.get() * x
+            })
+            .sum();
+
+        // Make sure the sum of the weights is 1
+        if !prob_sum.closes_to(Probability::certainty().get()) {
+            return None;
+        };
+
+        Some(weighted_sum)
+    }
+}
+
+impl<I: Iterator<Item = (Probability, f64)>> WeightedSumExt for I {}
+
 #[cfg(test)]
 mod tests {
+    use crate::float_ext::FloatExt;
+
     use super::*;
 
     #[test]
@@ -65,5 +94,15 @@ mod tests {
             Probability::certainty().complementary(),
             Probability::impossibility()
         );
+    }
+
+    #[test]
+    fn test_weighted_sum() {
+        let data = [(0.2, 25.0), (0.15, 20.0), (0.4, 15.0), (0.25, 30.0)];
+        let weighted_sum = data
+            .into_iter()
+            .map(|(p, x)| (Probability::new(p).unwrap(), x))
+            .weighted_sum();
+        assert!(weighted_sum.unwrap().closes_to(21.5));
     }
 }

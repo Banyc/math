@@ -2,7 +2,6 @@ use crate::float_ext::FloatExt;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Probability(f64);
-
 impl Probability {
     pub fn new(p: f64) -> Option<Self> {
         if !(0.0..=1.0).contains(&p) {
@@ -27,15 +26,12 @@ impl Probability {
         self.0
     }
 }
-
 impl PartialEq for Probability {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-
 impl Eq for Probability {}
-
 impl Ord for Probability {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0
@@ -43,7 +39,6 @@ impl Ord for Probability {
             .expect("`Probability` is impossible to be NaN")
     }
 }
-
 impl PartialOrd for Probability {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -72,8 +67,31 @@ pub trait WeightedSumExt: Iterator<Item = (Probability, f64)> {
         Some(weighted_sum)
     }
 }
-
 impl<I: Iterator<Item = (Probability, f64)>> WeightedSumExt for I {}
+
+#[derive(Debug, Clone)]
+pub struct Fraction<I> {
+    iter: I,
+    sum: f64,
+}
+impl<I: Iterator<Item = f64>> Iterator for Fraction<I> {
+    type Item = Option<Probability>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let Some(x) = self.iter.next() else {
+            return None;
+        };
+        Some(Probability::new(x / self.sum))
+    }
+}
+pub trait FractionExt: Iterator + Sized {
+    fn fraction(self) -> Fraction<Self>;
+}
+impl<I: Iterator<Item = f64> + Clone> FractionExt for I {
+    fn fraction(self) -> Fraction<Self> {
+        let sum = self.clone().sum();
+        Fraction { iter: self, sum }
+    }
+}
 
 #[cfg(test)]
 mod tests {

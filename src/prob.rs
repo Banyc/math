@@ -47,6 +47,12 @@ impl PartialOrd for Probability {
         Some(self.cmp(other))
     }
 }
+impl std::ops::Mul for Probability {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        Self::new(self.get() * rhs.get()).unwrap()
+    }
+}
 
 pub trait WeightedSumExt: Iterator<Item = (Probability, f64)> {
     /// # Option
@@ -128,5 +134,13 @@ mod tests {
             .map(|(p, x)| (Probability::new(p).unwrap(), x))
             .weighted_sum();
         assert!(weighted_sum.unwrap().closes_to(21.5));
+    }
+
+    #[test]
+    fn test_probability_mul() {
+        let a = Probability::new(f64::MIN_POSITIVE).unwrap();
+        let b = Probability::new(f64::MIN_POSITIVE).unwrap();
+        let c = a * b;
+        assert_eq!(c, Probability::impossibility());
     }
 }

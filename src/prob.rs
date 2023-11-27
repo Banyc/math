@@ -3,6 +3,9 @@ use crate::float_ext::FloatExt;
 #[derive(Debug, Clone, Copy)]
 pub struct Probability(f64);
 impl Probability {
+    /// # Option
+    ///
+    /// Return [`None`] if `p` is not in `[0, 1]`
     pub fn new(p: f64) -> Option<Self> {
         if !(0.0..=1.0).contains(&p) {
             return None;
@@ -46,6 +49,9 @@ impl PartialOrd for Probability {
 }
 
 pub trait WeightedSumExt: Iterator<Item = (Probability, f64)> {
+    /// # Option
+    ///
+    /// Return [`None`] if the sum of the weights is not equal to 1
     fn weighted_sum(self) -> Option<f64>
     where
         Self: Sized,

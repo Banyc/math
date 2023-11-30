@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
 
@@ -124,3 +126,20 @@ where
         variance.sqrt()
     }
 }
+
+pub trait DistanceExt: Iterator<Item = (f64, f64)> + Sized {
+    fn distance(self, p: NonZeroUsize) -> f64 {
+        let p_i32 = i32::try_from(p.get()).unwrap();
+        let sum = self.map(|(a, b)| (a - b).abs().powi(p_i32)).sum::<f64>();
+        match p.get() {
+            0 => unreachable!(),
+            1 => sum,
+            2 => sum.sqrt(),
+            _ => {
+                let inverse = 1.0 / p.get() as f64;
+                sum.powf(inverse)
+            }
+        }
+    }
+}
+impl<T: Iterator<Item = (f64, f64)>> DistanceExt for T {}

@@ -3,29 +3,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::statistics::{MeanExt, StandardDeviationExt};
 
-#[derive(Debug, Clone)]
-pub struct Standardized<I> {
-    iter: I,
-    sc: StandardScaler,
-}
-impl<I: Iterator<Item = f64>> Iterator for Standardized<I> {
-    type Item = I::Item;
+use super::{Transformed, Transformer};
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iter
-            .next()
-            .map(move |x| (x - self.sc.mean()) / self.sc.standard_deviation())
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
-    }
-}
-impl<I> Standardized<I> {
-    pub fn new(iter: I, sc: StandardScaler) -> Self {
-        Self { iter, sc }
-    }
-}
+pub type Standardized<I> = Transformed<I, StandardScaler>;
 
 pub trait StandardizedExt: Iterator {
     /// Standardizes the iterator based on the iterator itself.
@@ -88,6 +68,20 @@ impl StandardScaler {
     /// Fits a standard scaler from the elements of the iterator,
     /// so that you can use this scaler to standardize another iterator.
     pub fn fit(examples: impl Iterator<Item = f64> + Clone) -> Self {
+        let mean = examples.clone().mean();
+        let standard_deviation = examples.standard_deviation();
+        Self {
+            mean,
+            standard_deviation,
+        }
+    }
+}
+impl Transformer for StandardScaler {
+    fn transform(&self, x: f64) -> f64 {
+        (x - self.mean()) / self.standard_deviation()
+    }
+
+    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Self {
         let mean = examples.clone().mean();
         let standard_deviation = examples.standard_deviation();
         Self {

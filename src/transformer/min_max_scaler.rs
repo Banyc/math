@@ -21,15 +21,15 @@ impl Transformer for MinMaxScaler {
         let mut min = f64::MAX;
         let mut max = f64::MIN;
 
-        for example in examples {
-            if example.is_nan() {
+        for x in examples {
+            if x.is_nan() {
                 return Err(MinMaxScalerError::MissingNumber);
             }
-            if example < min {
-                min = example;
+            if x < min {
+                min = x;
             }
-            if example > max {
-                max = example;
+            if x > max {
+                max = x;
             }
         }
 

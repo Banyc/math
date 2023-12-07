@@ -79,6 +79,7 @@ impl StandardScaler {
     }
 }
 impl Transformer for StandardScaler {
+    type Value = f64;
     type Err = Infallible;
 
     fn transform(&self, x: f64) -> f64 {

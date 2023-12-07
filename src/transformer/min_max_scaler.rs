@@ -7,6 +7,7 @@ pub struct MinMaxScaler {
     max: f64,
 }
 impl Transformer for MinMaxScaler {
+    type Value = f64;
     type Err = MinMaxScalerError;
 
     fn transform(&self, x: f64) -> f64 {

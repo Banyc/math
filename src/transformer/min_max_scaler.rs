@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use super::Transformer;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MinMaxScaler {
     min: f64,
     max: f64,

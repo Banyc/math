@@ -1,12 +1,15 @@
+pub mod min_max_scaler;
 pub mod standard_scaler;
 
 pub trait Transformer {
+    type Err;
+
     /// Transform a value.
     fn transform(&self, x: f64) -> f64;
 
     /// Fits a transformer from the elements of the iterator,
     /// so that you can use this transformer to transform another iterator.
-    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Self
+    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Result<Self, Self::Err>
     where
         Self: Sized;
 }
@@ -14,7 +17,7 @@ pub trait Transformer {
 pub trait TransformExt: Iterator {
     /// Fits a transformer from the elements of the iterator,
     /// so that you can use this transformer to transform another iterator.
-    fn fit<T: Transformer>(self) -> T;
+    fn fit<T: Transformer>(self) -> Result<T, T::Err>;
 
     /// Map the iterator with a transformer.
     ///
@@ -26,7 +29,7 @@ pub trait TransformExt: Iterator {
         T: Transformer;
 }
 impl<I: Iterator<Item = f64> + Clone> TransformExt for I {
-    fn fit<T: Transformer>(self) -> T {
+    fn fit<T: Transformer>(self) -> Result<T, T::Err> {
         T::fit(self)
     }
 

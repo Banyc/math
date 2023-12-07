@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
 
@@ -77,16 +79,18 @@ impl StandardScaler {
     }
 }
 impl Transformer for StandardScaler {
+    type Err = Infallible;
+
     fn transform(&self, x: f64) -> f64 {
         (x - self.mean()) / self.standard_deviation()
     }
 
-    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Self {
+    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Result<Self, Self::Err> {
         let mean = examples.clone().mean();
         let standard_deviation = examples.standard_deviation();
-        Self {
+        Ok(Self {
             mean,
             standard_deviation,
-        }
+        })
     }
 }

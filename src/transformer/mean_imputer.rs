@@ -20,10 +20,7 @@ impl Transformer for MeanImputer {
         x
     }
 
-    fn fit(examples: impl Iterator<Item = Self::Value> + Clone) -> Result<Self, Self::Err>
-    where
-        Self: Sized,
-    {
+    fn fit(examples: impl Iterator<Item = Self::Value> + Clone) -> Result<Self, Self::Err> {
         let mean = examples.clone().filter(|x| !x.is_nan()).mean();
         Ok(Self { mean })
     }

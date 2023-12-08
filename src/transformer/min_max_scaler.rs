@@ -15,10 +15,7 @@ impl Transformer for MinMaxScaler {
         (x - self.min) / (self.max - self.min)
     }
 
-    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Result<Self, Self::Err>
-    where
-        Self: Sized,
-    {
+    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Result<Self, Self::Err> {
         let mut min = f64::MAX;
         let mut max = f64::MIN;
 

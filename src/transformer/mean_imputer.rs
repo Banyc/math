@@ -24,7 +24,24 @@ impl Transformer for MeanImputer {
     where
         Self: Sized,
     {
-        let mean = examples.mean();
+        let mean = examples.clone().filter(|x| !x.is_nan()).mean();
         Ok(Self { mean })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::transformer::TransformExt;
+
+    use super::*;
+
+    #[test]
+    fn test_missing_numbers() {
+        let examples = [2.0, f64::NAN, 5.0];
+        let imp_mean = examples.into_iter().fit::<MeanImputer>().unwrap();
+        let examples = [2.0, f64::NAN, f64::NAN];
+        let transformed = examples.into_iter().transform_by(imp_mean);
+        let x = transformed.collect::<Vec<_>>();
+        assert_eq!(x, [2.0, 3.5, 3.5]);
     }
 }

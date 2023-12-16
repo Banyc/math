@@ -46,3 +46,20 @@ pub enum MinMaxScalerError {
     #[error("No number in the iterator")]
     NoNumber,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::transformer::TransformExt;
+
+    use super::*;
+
+    #[test]
+    fn test() {
+        let examples = [-1.0, -0.5, 0.0, 1.0];
+        let scaler = examples.into_iter().fit::<MinMaxScaler>().unwrap();
+        assert_eq!(scaler.max, 1.0);
+        let transformed = examples.into_iter().transform_by(scaler);
+        let x = transformed.collect::<Vec<_>>();
+        assert_eq!(x, [0.0, 0.25, 0.5, 1.0]);
+    }
+}

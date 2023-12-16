@@ -1,5 +1,6 @@
 pub mod mean_imputer;
 pub mod min_max_scaler;
+pub mod proportion_scaler;
 pub mod standard_scaler;
 
 pub trait Estimate {

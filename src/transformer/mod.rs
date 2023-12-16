@@ -2,35 +2,45 @@ pub mod mean_imputer;
 pub mod min_max_scaler;
 pub mod standard_scaler;
 
-pub trait Transformer {
+pub trait Estimate {
+    type Err;
+    type Value;
+    type Output;
+
+    /// Fits a transformer from the elements of the iterator,
+    /// so that you can use this transformer to transform another iterator.
+    fn fit(
+        &self,
+        examples: impl Iterator<Item = Self::Value> + Clone,
+    ) -> Result<Self::Output, Self::Err>
+    where
+        Self: Sized;
+}
+pub trait EstimateExt: Iterator {
+    /// Fits a transformer from the elements of the iterator,
+    /// so that you can use this transformer to transform another iterator.
+    fn fit<E: Estimate<Value = Self::Item>>(self, estimator: &E) -> Result<E::Output, E::Err>
+    where
+        Self: Clone,
+    {
+        estimator.fit(self)
+    }
+}
+impl<I: Iterator> EstimateExt for I {}
+
+pub trait Transform {
     type Err;
     type Value;
 
     /// Transform a value.
     fn transform(&self, x: Self::Value) -> Self::Value;
-
-    /// Fits a transformer from the elements of the iterator,
-    /// so that you can use this transformer to transform another iterator.
-    fn fit(examples: impl Iterator<Item = Self::Value> + Clone) -> Result<Self, Self::Err>
-    where
-        Self: Sized;
 }
-
 pub trait TransformExt: Iterator {
-    /// Fits a transformer from the elements of the iterator,
-    /// so that you can use this transformer to transform another iterator.
-    fn fit<T: Transformer<Value = Self::Item>>(self) -> Result<T, T::Err>
-    where
-        Self: Clone,
-    {
-        T::fit(self)
-    }
-
     /// Maps the iterator with a transformer.
     ///
     /// This only transforms the iterator based on the provided transformer,
     /// not on the iterator itself.
-    fn transform_by<T: Transformer>(self, transformer: T) -> Transformed<Self, T>
+    fn transform_by<T: Transform>(self, transformer: T) -> Transformed<Self, T>
     where
         Self: Sized,
     {
@@ -39,13 +49,17 @@ pub trait TransformExt: Iterator {
 
     /// Fits a transformer from the elements of the iterator
     /// and then maps the iterator with the transformer.
-    fn fit_transform<T: Transformer<Value = Self::Item>>(
+    fn fit_transform<
+        E: Estimate<Value = Self::Item, Output = T, Err = T::Err>,
+        T: Transform<Value = Self::Item>,
+    >(
         self,
+        estimator: &E,
     ) -> Result<Transformed<Self, T>, T::Err>
     where
         Self: Clone,
     {
-        let t = T::fit(self.clone())?;
+        let t = estimator.fit(self.clone())?;
         Ok(self.transform_by(t))
     }
 }
@@ -59,7 +73,7 @@ pub struct Transformed<I, T> {
 impl<I, T> Iterator for Transformed<I, T>
 where
     I: Iterator,
-    T: Transformer<Value = I::Item>,
+    T: Transform<Value = I::Item>,
 {
     type Item = I::Item;
 

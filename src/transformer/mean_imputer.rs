@@ -2,14 +2,33 @@ use std::convert::Infallible;
 
 use crate::statistics::MeanExt;
 
-use super::Transformer;
+use super::{Estimate, Transform};
+
+#[derive(Debug, Clone, Copy)]
+pub struct MeanImputationEstimator;
+impl Estimate for MeanImputationEstimator {
+    type Err = Infallible;
+    type Value = f64;
+    type Output = MeanImputer;
+
+    fn fit(
+        &self,
+        examples: impl Iterator<Item = Self::Value> + Clone,
+    ) -> Result<Self::Output, Self::Err>
+    where
+        Self: Sized,
+    {
+        let mean = examples.clone().filter(|x| !x.is_nan()).mean();
+        Ok(MeanImputer { mean })
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct MeanImputer {
     mean: f64,
 }
 
-impl Transformer for MeanImputer {
+impl Transform for MeanImputer {
     type Err = Infallible;
     type Value = f64;
 
@@ -19,23 +38,18 @@ impl Transformer for MeanImputer {
         }
         x
     }
-
-    fn fit(examples: impl Iterator<Item = Self::Value> + Clone) -> Result<Self, Self::Err> {
-        let mean = examples.clone().filter(|x| !x.is_nan()).mean();
-        Ok(Self { mean })
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::transformer::TransformExt;
+    use crate::transformer::{EstimateExt, TransformExt};
 
     use super::*;
 
     #[test]
     fn test_missing_numbers() {
         let examples = [2.0, f64::NAN, 5.0];
-        let imp_mean = examples.into_iter().fit::<MeanImputer>().unwrap();
+        let imp_mean = examples.into_iter().fit(&MeanImputationEstimator).unwrap();
         let examples = [2.0, f64::NAN, f64::NAN];
         let transformed = examples.into_iter().transform_by(imp_mean);
         let x = transformed.collect::<Vec<_>>();

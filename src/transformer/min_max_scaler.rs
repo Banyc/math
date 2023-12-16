@@ -1,21 +1,35 @@
+use std::ops::RangeInclusive;
+
 use thiserror::Error;
 
-use super::Transformer;
+use super::{Estimate, Transform};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct MinMaxScaler {
-    min: f64,
-    max: f64,
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinMaxScalingEstimator {
+    range: RangeInclusive<f64>,
 }
-impl Transformer for MinMaxScaler {
-    type Value = f64;
-    type Err = MinMaxScalerError;
-
-    fn transform(&self, x: f64) -> f64 {
-        (x - self.min) / (self.max - self.min)
+impl MinMaxScalingEstimator {
+    pub fn new(range: RangeInclusive<f64>) -> Self {
+        Self { range }
     }
+}
+impl Default for MinMaxScalingEstimator {
+    fn default() -> Self {
+        Self { range: 0. ..=1. }
+    }
+}
+impl Estimate for MinMaxScalingEstimator {
+    type Err = MinMaxScalerError;
+    type Value = f64;
+    type Output = MinMaxScaler;
 
-    fn fit(examples: impl Iterator<Item = f64> + Clone) -> Result<Self, Self::Err> {
+    fn fit(
+        &self,
+        examples: impl Iterator<Item = Self::Value> + Clone,
+    ) -> Result<Self::Output, Self::Err>
+    where
+        Self: Sized,
+    {
         let mut min = f64::MAX;
         let mut max = f64::MIN;
 
@@ -35,7 +49,27 @@ impl Transformer for MinMaxScaler {
             return Err(MinMaxScalerError::NoNumber);
         };
 
-        Ok(Self { min, max })
+        Ok(MinMaxScaler {
+            min,
+            max,
+            range: self.range.clone(),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinMaxScaler {
+    min: f64,
+    max: f64,
+    range: std::ops::RangeInclusive<f64>,
+}
+impl Transform for MinMaxScaler {
+    type Value = f64;
+    type Err = MinMaxScalerError;
+
+    fn transform(&self, x: f64) -> f64 {
+        let x_std = (x - self.min) / (self.max - self.min);
+        x_std * (self.range.end() - self.range.start()) + self.range.start()
     }
 }
 
@@ -49,14 +83,17 @@ pub enum MinMaxScalerError {
 
 #[cfg(test)]
 mod tests {
-    use crate::transformer::TransformExt;
+    use crate::transformer::{EstimateExt, TransformExt};
 
     use super::*;
 
     #[test]
     fn test() {
         let examples = [-1.0, -0.5, 0.0, 1.0];
-        let scaler = examples.into_iter().fit::<MinMaxScaler>().unwrap();
+        let scaler = examples
+            .into_iter()
+            .fit(&MinMaxScalingEstimator::default())
+            .unwrap();
         assert_eq!(scaler.max, 1.0);
         let transformed = examples.into_iter().transform_by(scaler);
         let x = transformed.collect::<Vec<_>>();

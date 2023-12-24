@@ -1,8 +1,7 @@
-use std::{convert::Infallible, ops::RangeInclusive};
+use std::ops::RangeInclusive;
 
-use strict_num::FiniteF64;
-
-use crate::statistics::EmptySequenceError;
+use strict_num::{FiniteF64, PositiveF64};
+use thiserror::Error;
 
 use super::{Estimate, Transform};
 
@@ -11,8 +10,13 @@ pub struct MinMaxScalingEstimator {
     range: RangeInclusive<FiniteF64>,
 }
 impl MinMaxScalingEstimator {
-    pub fn new(range: RangeInclusive<FiniteF64>) -> Self {
-        Self { range }
+    pub fn new(
+        range: RangeInclusive<FiniteF64>,
+    ) -> Result<Self, InfiniteOrNegativeGivenRangeLengthError> {
+        if PositiveF64::new(range.end().get() - range.start().get()).is_none() {
+            return Err(InfiniteOrNegativeGivenRangeLengthError);
+        }
+        Ok(Self { range })
     }
 }
 impl Default for MinMaxScalingEstimator {
@@ -23,7 +27,7 @@ impl Default for MinMaxScalingEstimator {
     }
 }
 impl Estimate for MinMaxScalingEstimator {
-    type Err = EmptySequenceError;
+    type Err = MinMaxScalingEstimateError;
     type Value = FiniteF64;
     type Output = MinMaxScaler;
 
@@ -47,8 +51,11 @@ impl Estimate for MinMaxScalingEstimator {
         }
 
         if max < min {
-            return Err(EmptySequenceError);
+            return Err(Self::Err::EmptySequenceError);
         };
+        if FiniteF64::new(max - min).is_none() {
+            return Err(Self::Err::InfiniteMinMaxRange);
+        }
 
         Ok(MinMaxScaler {
             min: FiniteF64::new(min).unwrap(),
@@ -57,6 +64,16 @@ impl Estimate for MinMaxScalingEstimator {
         })
     }
 }
+#[derive(Debug, Error, Clone, Copy)]
+pub enum MinMaxScalingEstimateError {
+    #[error("Empty sequence")]
+    EmptySequenceError,
+    #[error("Infinite min max range")]
+    InfiniteMinMaxRange,
+}
+#[derive(Debug, Error, Clone, Copy)]
+#[error("Length of given range is either infinite or negative")]
+pub struct InfiniteOrNegativeGivenRangeLengthError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MinMaxScaler {
@@ -66,15 +83,21 @@ pub struct MinMaxScaler {
 }
 impl Transform for MinMaxScaler {
     type Value = FiniteF64;
-    type Err = Infallible;
+    type Err = OutOfRange;
 
     fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+        if !(self.min..=self.max).contains(&x) {
+            return Err(OutOfRange);
+        }
         let x_std = (x.get() - self.min.get()) / (self.max.get() - self.min.get());
         let scaled =
             x_std * (self.range.end().get() - self.range.start().get()) + self.range.start().get();
         Ok(FiniteF64::new(scaled).unwrap())
     }
 }
+#[derive(Debug, Error, Clone, Copy)]
+#[error("Input is out of min max range")]
+pub struct OutOfRange;
 
 #[cfg(test)]
 mod tests {
@@ -94,5 +117,19 @@ mod tests {
         let transformed = examples.transform_by(scaler);
         let x = transformed.collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(x, [0.0, 0.25, 0.5, 1.0]);
+    }
+
+    #[test]
+    fn test_edge() {
+        assert!(MinMaxScalingEstimator::new(
+            FiniteF64::new(1.0).unwrap()..=FiniteF64::new(0.0).unwrap()
+        )
+        .is_err());
+
+        let examples = [f64::MIN, f64::MAX];
+        let examples = examples.into_iter().map(|x| FiniteF64::new(x).unwrap());
+        assert!(examples
+            .fit_transform(&MinMaxScalingEstimator::default())
+            .is_err());
     }
 }

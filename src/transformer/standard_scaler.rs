@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
 
-use crate::statistics::{MeanExt, StandardDeviationExt};
+use crate::statistics::{EmptySequenceError, MeanExt, StandardDeviationExt};
 
 use super::{Estimate, Transform, Transformed};
 
@@ -13,7 +13,7 @@ pub type Standardized<I> = Transformed<I, StandardScaler>;
 pub struct StandardScalingEstimator;
 impl Estimate for StandardScalingEstimator {
     type Value = f64;
-    type Err = Infallible;
+    type Err = EmptySequenceError;
     type Output = StandardScaler;
 
     fn fit(
@@ -23,8 +23,8 @@ impl Estimate for StandardScalingEstimator {
     where
         Self: Sized,
     {
-        let mean = examples.clone().mean();
-        let standard_deviation = examples.standard_deviation();
+        let mean = examples.clone().mean()?;
+        let standard_deviation = examples.standard_deviation()?;
         Ok(StandardScaler {
             mean,
             standard_deviation,

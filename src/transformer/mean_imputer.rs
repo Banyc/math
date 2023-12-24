@@ -1,13 +1,13 @@
 use std::convert::Infallible;
 
-use crate::statistics::MeanExt;
+use crate::statistics::{EmptySequenceError, MeanExt};
 
 use super::{Estimate, Transform};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MeanImputationEstimator;
 impl Estimate for MeanImputationEstimator {
-    type Err = Infallible;
+    type Err = EmptySequenceError;
     type Value = f64;
     type Output = MeanImputer;
 
@@ -18,7 +18,7 @@ impl Estimate for MeanImputationEstimator {
     where
         Self: Sized,
     {
-        let mean = examples.clone().filter(|x| !x.is_nan()).mean();
+        let mean = examples.clone().filter(|x| !x.is_nan()).mean()?;
         Ok(MeanImputer { mean })
     }
 }

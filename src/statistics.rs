@@ -1,32 +1,40 @@
 use std::num::NonZeroUsize;
 
+use thiserror::Error;
+
 pub trait MeanExt: Iterator {
-    fn mean(self) -> f64;
+    fn mean(self) -> Result<f64, EmptySequenceError>;
 }
 impl<T> MeanExt for T
 where
     T: Iterator<Item = f64> + Clone,
 {
-    fn mean(self) -> f64 {
+    fn mean(self) -> Result<f64, EmptySequenceError> {
         let n: usize = self.clone().count();
+        if n == 0 {
+            return Err(EmptySequenceError);
+        }
         // Sum of fractions is used to avoid infinite value
-        self.map(|x| x / n as f64).sum()
+        Ok(self.map(|x| x / n as f64).sum())
     }
 }
+#[derive(Debug, Error, Clone, Copy)]
+#[error("Empty sequence")]
+pub struct EmptySequenceError;
 
 pub trait StandardDeviationExt: Iterator {
-    fn standard_deviation(self) -> f64;
+    fn standard_deviation(self) -> Result<f64, EmptySequenceError>;
 }
 impl<T> StandardDeviationExt for T
 where
     T: Iterator<Item = f64> + Clone,
 {
-    fn standard_deviation(self) -> f64 {
-        let mean = self.clone().mean();
+    fn standard_deviation(self) -> Result<f64, EmptySequenceError> {
+        let mean = self.clone().mean()?;
         let n: usize = self.clone().count();
         let sum_squared_error: f64 = self.map(|x| (x - mean).powi(2)).sum();
         let variance = sum_squared_error / n as f64;
-        variance.sqrt()
+        Ok(variance.sqrt())
     }
 }
 
@@ -46,3 +54,18 @@ pub trait DistanceExt: Iterator<Item = (f64, f64)> + Sized {
     }
 }
 impl<T: Iterator<Item = (f64, f64)>> DistanceExt for T {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mean() {
+        let polarized = [f64::NEG_INFINITY, f64::INFINITY];
+        let mean = polarized.iter().copied().mean().unwrap();
+        assert!(mean.is_nan());
+
+        let empty: [f64; 0] = [];
+        assert!(empty.iter().copied().mean().is_err());
+    }
+}

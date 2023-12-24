@@ -1,32 +1,32 @@
+use strict_num::NormalizedF64;
+
 use crate::float_ext::FloatExt;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Probability(f64);
+pub struct Probability(NormalizedF64);
 impl Probability {
     /// # Option
     ///
     /// Return [`None`] if `p` is not in `[0, 1]`
     pub fn new(p: f64) -> Option<Self> {
-        if !(0.0..=1.0).contains(&p) {
-            return None;
-        }
+        let p = NormalizedF64::new(p)?;
         Some(Self(p))
     }
 
     pub fn certainty() -> Self {
-        Self(1.0)
+        Self(NormalizedF64::new(1.0).unwrap())
     }
 
     pub fn impossibility() -> Self {
-        Self(0.0)
+        Self(NormalizedF64::new(0.0).unwrap())
     }
 
     pub fn complementary(&self) -> Self {
-        Self(1.0 - self.0)
+        Self(NormalizedF64::new(1.0 - self.0.get()).unwrap())
     }
 
     pub fn get(&self) -> f64 {
-        self.0
+        self.0.get()
     }
 }
 impl PartialEq for Probability {
@@ -51,6 +51,16 @@ impl std::ops::Mul for Probability {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         Self::new(self.get() * rhs.get()).unwrap()
+    }
+}
+impl From<Probability> for NormalizedF64 {
+    fn from(value: Probability) -> Self {
+        NormalizedF64::new(value.get()).unwrap()
+    }
+}
+impl From<NormalizedF64> for Probability {
+    fn from(value: NormalizedF64) -> Self {
+        Self::new(value.get()).unwrap()
     }
 }
 

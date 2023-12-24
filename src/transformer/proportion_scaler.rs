@@ -1,7 +1,5 @@
-use std::convert::Infallible;
-
 use getset::CopyGetters;
-use strict_num::FiniteF64;
+use strict_num::PositiveF64;
 use thiserror::Error;
 
 use super::{Estimate, Transform};
@@ -9,7 +7,7 @@ use super::{Estimate, Transform};
 #[derive(Debug, Clone, Copy)]
 pub struct ProportionScalingEstimator;
 impl Estimate for ProportionScalingEstimator {
-    type Value = FiniteF64;
+    type Value = PositiveF64;
     type Err = InfiniteSum;
     type Output = ProportionScaler;
 
@@ -21,7 +19,7 @@ impl Estimate for ProportionScalingEstimator {
         Self: Sized,
     {
         let sum = examples.map(|x| x.get()).sum();
-        let Some(sum) = FiniteF64::new(sum) else {
+        let Some(sum) = PositiveF64::new(sum) else {
             return Err(InfiniteSum);
         };
         Ok(ProportionScaler { sum })
@@ -34,14 +32,20 @@ pub struct InfiniteSum;
 #[derive(Debug, Clone, Copy, CopyGetters)]
 pub struct ProportionScaler {
     #[getset(get_copy = "pub")]
-    sum: FiniteF64,
+    sum: PositiveF64,
 }
 impl Transform for ProportionScaler {
-    type Value = FiniteF64;
-    type Err = Infallible;
+    type Value = PositiveF64;
+    type Err = GreaterThanSum;
 
     fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+        if self.sum.get() < x.get() {
+            return Err(GreaterThanSum);
+        }
         let scaled = x.get() / self.sum.get();
-        Ok(FiniteF64::new(scaled).unwrap())
+        Ok(PositiveF64::new(scaled).unwrap())
     }
 }
+#[derive(Debug, Error, Clone, Copy)]
+#[error("Input is greater than sum")]
+pub struct GreaterThanSum;

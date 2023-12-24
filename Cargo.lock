@@ -99,6 +99,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290fd5eab900654f4c270bc1cfaeb0f2c17b6851fa448fc22e1778dec105ac68"
 dependencies = [
  "float-cmp",
+ "serde",
 ]
 
 [[package]]

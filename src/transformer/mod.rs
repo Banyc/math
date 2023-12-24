@@ -34,7 +34,7 @@ pub trait Transform {
     type Value;
 
     /// Transform a value.
-    fn transform(&self, x: Self::Value) -> Self::Value;
+    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err>;
 }
 pub trait TransformExt: Iterator {
     /// Maps the iterator with a transformer.
@@ -51,12 +51,12 @@ pub trait TransformExt: Iterator {
     /// Fits a transformer from the elements of the iterator
     /// and then maps the iterator with the transformer.
     fn fit_transform<
-        E: Estimate<Value = Self::Item, Output = T, Err = T::Err>,
+        E: Estimate<Value = Self::Item, Output = T>,
         T: Transform<Value = Self::Item>,
     >(
         self,
         estimator: &E,
-    ) -> Result<Transformed<Self, T>, T::Err>
+    ) -> Result<Transformed<Self, T>, E::Err>
     where
         Self: Clone,
     {
@@ -76,7 +76,7 @@ where
     I: Iterator,
     T: Transform<Value = I::Item>,
 {
-    type Item = I::Item;
+    type Item = Result<I::Item, T::Err>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next().map(|x| self.transformer.transform(x))

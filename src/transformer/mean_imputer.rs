@@ -32,11 +32,11 @@ impl Transform for MeanImputer {
     type Err = Infallible;
     type Value = f64;
 
-    fn transform(&self, x: Self::Value) -> Self::Value {
+    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
         if x.is_nan() {
-            return self.mean;
+            return Ok(self.mean);
         }
-        x
+        Ok(x)
     }
 }
 
@@ -52,7 +52,7 @@ mod tests {
         let imp_mean = examples.into_iter().fit(&MeanImputationEstimator).unwrap();
         let examples = [2.0, f64::NAN, f64::NAN];
         let transformed = examples.into_iter().transform_by(imp_mean);
-        let x = transformed.collect::<Vec<_>>();
+        let x = transformed.collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(x, [2.0, 3.5, 3.5]);
     }
 }

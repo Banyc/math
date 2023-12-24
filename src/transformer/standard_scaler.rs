@@ -2,8 +2,9 @@ use std::convert::Infallible;
 
 use getset::CopyGetters;
 use serde::{Deserialize, Serialize};
+use strict_num::FiniteF64;
 
-use crate::statistics::{EmptySequenceError, MeanExt, StandardDeviationExt};
+use crate::statistics::{EmptySequenceError, FiniteMeanExt, FiniteStandardDeviationExt};
 
 use super::{Estimate, Transform, Transformed};
 
@@ -12,7 +13,7 @@ pub type Standardized<I> = Transformed<I, StandardScaler>;
 #[derive(Debug, Clone, Copy)]
 pub struct StandardScalingEstimator;
 impl Estimate for StandardScalingEstimator {
-    type Value = f64;
+    type Value = FiniteF64;
     type Err = EmptySequenceError;
     type Output = StandardScaler;
 
@@ -36,12 +37,12 @@ impl Estimate for StandardScalingEstimator {
 /// Borrowed from `sklearn.preprocessing.StandardScaler` but only for one feature.
 pub struct StandardScaler {
     #[getset(get_copy = "pub")]
-    mean: f64,
+    mean: FiniteF64,
     #[getset(get_copy = "pub")]
-    standard_deviation: f64,
+    standard_deviation: FiniteF64,
 }
 impl StandardScaler {
-    pub fn new(mean: f64, standard_deviation: f64) -> Self {
+    pub fn new(mean: FiniteF64, standard_deviation: FiniteF64) -> Self {
         Self {
             mean,
             standard_deviation,
@@ -49,10 +50,11 @@ impl StandardScaler {
     }
 }
 impl Transform for StandardScaler {
-    type Value = f64;
+    type Value = FiniteF64;
     type Err = Infallible;
 
-    fn transform(&self, x: f64) -> f64 {
-        (x - self.mean()) / self.standard_deviation()
+    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+        let scaled = (x.get() - self.mean().get()) / self.standard_deviation().get();
+        Ok(FiniteF64::new(scaled).unwrap())
     }
 }

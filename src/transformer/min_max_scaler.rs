@@ -1,26 +1,30 @@
-use std::ops::RangeInclusive;
+use std::{convert::Infallible, ops::RangeInclusive};
 
-use thiserror::Error;
+use strict_num::FiniteF64;
+
+use crate::statistics::EmptySequenceError;
 
 use super::{Estimate, Transform};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MinMaxScalingEstimator {
-    range: RangeInclusive<f64>,
+    range: RangeInclusive<FiniteF64>,
 }
 impl MinMaxScalingEstimator {
-    pub fn new(range: RangeInclusive<f64>) -> Self {
+    pub fn new(range: RangeInclusive<FiniteF64>) -> Self {
         Self { range }
     }
 }
 impl Default for MinMaxScalingEstimator {
     fn default() -> Self {
-        Self { range: 0. ..=1. }
+        Self {
+            range: FiniteF64::new(0.).unwrap()..=FiniteF64::new(1.).unwrap(),
+        }
     }
 }
 impl Estimate for MinMaxScalingEstimator {
-    type Err = MinMaxScalerError;
-    type Value = f64;
+    type Err = EmptySequenceError;
+    type Value = FiniteF64;
     type Output = MinMaxScaler;
 
     fn fit(
@@ -30,28 +34,25 @@ impl Estimate for MinMaxScalingEstimator {
     where
         Self: Sized,
     {
-        let mut min = f64::MAX;
-        let mut max = f64::MIN;
+        let mut min = f64::INFINITY;
+        let mut max = f64::NEG_INFINITY;
 
         for x in examples {
-            if x.is_nan() {
-                return Err(MinMaxScalerError::MissingNumber);
+            if x.get() < min {
+                min = x.get();
             }
-            if x < min {
-                min = x;
-            }
-            if x > max {
-                max = x;
+            if x.get() > max {
+                max = x.get();
             }
         }
 
         if max < min {
-            return Err(MinMaxScalerError::NoNumber);
+            return Err(EmptySequenceError);
         };
 
         Ok(MinMaxScaler {
-            min,
-            max,
+            min: FiniteF64::new(min).unwrap(),
+            max: FiniteF64::new(max).unwrap(),
             range: self.range.clone(),
         })
     }
@@ -59,26 +60,20 @@ impl Estimate for MinMaxScalingEstimator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MinMaxScaler {
-    min: f64,
-    max: f64,
-    range: std::ops::RangeInclusive<f64>,
+    min: FiniteF64,
+    max: FiniteF64,
+    range: std::ops::RangeInclusive<FiniteF64>,
 }
 impl Transform for MinMaxScaler {
-    type Value = f64;
-    type Err = MinMaxScalerError;
+    type Value = FiniteF64;
+    type Err = Infallible;
 
-    fn transform(&self, x: f64) -> f64 {
-        let x_std = (x - self.min) / (self.max - self.min);
-        x_std * (self.range.end() - self.range.start()) + self.range.start()
+    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+        let x_std = (x.get() - self.min.get()) / (self.max.get() - self.min.get());
+        let scaled =
+            x_std * (self.range.end().get() - self.range.start().get()) + self.range.start().get();
+        Ok(FiniteF64::new(scaled).unwrap())
     }
-}
-
-#[derive(Debug, Clone, Error)]
-pub enum MinMaxScalerError {
-    #[error("A number is NAN in the iterator")]
-    MissingNumber,
-    #[error("No number in the iterator")]
-    NoNumber,
 }
 
 #[cfg(test)]
@@ -90,13 +85,14 @@ mod tests {
     #[test]
     fn test() {
         let examples = [-1.0, -0.5, 0.0, 1.0];
+        let examples = examples.into_iter().map(|x| FiniteF64::new(x).unwrap());
         let scaler = examples
-            .into_iter()
+            .clone()
             .fit(&MinMaxScalingEstimator::default())
             .unwrap();
         assert_eq!(scaler.max, 1.0);
-        let transformed = examples.into_iter().transform_by(scaler);
-        let x = transformed.collect::<Vec<_>>();
+        let transformed = examples.transform_by(scaler);
+        let x = transformed.collect::<Result<Vec<_>, _>>().unwrap();
         assert_eq!(x, [0.0, 0.25, 0.5, 1.0]);
     }
 }

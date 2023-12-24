@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 
+use strict_num::FiniteF64;
 use thiserror::Error;
 
 pub trait MeanExt: Iterator {
@@ -22,6 +23,20 @@ where
 #[error("Empty sequence")]
 pub struct EmptySequenceError;
 
+pub trait FiniteMeanExt: Iterator {
+    fn mean(self) -> Result<FiniteF64, EmptySequenceError>;
+}
+impl<T> FiniteMeanExt for T
+where
+    T: Iterator<Item = FiniteF64> + Clone,
+{
+    fn mean(self) -> Result<FiniteF64, EmptySequenceError> {
+        self.map(|x| x.get())
+            .mean()
+            .map(|x| FiniteF64::new(x).unwrap())
+    }
+}
+
 pub trait StandardDeviationExt: Iterator {
     fn standard_deviation(self) -> Result<f64, EmptySequenceError>;
 }
@@ -32,9 +47,22 @@ where
     fn standard_deviation(self) -> Result<f64, EmptySequenceError> {
         let mean = self.clone().mean()?;
         let n: usize = self.clone().count();
-        let sum_squared_error: f64 = self.map(|x| (x - mean).powi(2)).sum();
-        let variance = sum_squared_error / n as f64;
+        let variance: f64 = self.map(|x| (x - mean).powi(2) / n as f64).sum();
         Ok(variance.sqrt())
+    }
+}
+
+pub trait FiniteStandardDeviationExt: Iterator {
+    fn standard_deviation(self) -> Result<FiniteF64, EmptySequenceError>;
+}
+impl<T> FiniteStandardDeviationExt for T
+where
+    T: Iterator<Item = FiniteF64> + Clone,
+{
+    fn standard_deviation(self) -> Result<FiniteF64, EmptySequenceError> {
+        self.map(|x| x.get())
+            .standard_deviation()
+            .map(|x| FiniteF64::new(x).unwrap())
     }
 }
 
@@ -54,6 +82,14 @@ pub trait DistanceExt: Iterator<Item = (f64, f64)> + Sized {
     }
 }
 impl<T: Iterator<Item = (f64, f64)>> DistanceExt for T {}
+
+pub trait FiniteDistanceExt: Iterator<Item = (FiniteF64, FiniteF64)> + Sized {
+    fn distance(self, p: NonZeroUsize) -> FiniteF64 {
+        let d = self.map(|(a, b)| (a.get(), b.get())).distance(p);
+        FiniteF64::new(d).unwrap()
+    }
+}
+impl<T: Iterator<Item = (FiniteF64, FiniteF64)>> FiniteDistanceExt for T {}
 
 #[cfg(test)]
 mod tests {

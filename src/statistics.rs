@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use strict_num::FiniteF64;
+use strict_num::{FiniteF64, PositiveF64};
 use thiserror::Error;
 
 pub trait MeanExt: Iterator {
@@ -53,16 +53,16 @@ where
 }
 
 pub trait FiniteStandardDeviationExt: Iterator {
-    fn standard_deviation(self) -> Result<FiniteF64, EmptySequenceError>;
+    fn standard_deviation(self) -> Result<PositiveF64, EmptySequenceError>;
 }
 impl<T> FiniteStandardDeviationExt for T
 where
     T: Iterator<Item = FiniteF64> + Clone,
 {
-    fn standard_deviation(self) -> Result<FiniteF64, EmptySequenceError> {
+    fn standard_deviation(self) -> Result<PositiveF64, EmptySequenceError> {
         self.map(|x| x.get())
             .standard_deviation()
-            .map(|x| FiniteF64::new(x).unwrap())
+            .map(|x| PositiveF64::new(x).unwrap())
     }
 }
 

@@ -53,17 +53,29 @@ where
 }
 
 pub trait FiniteStandardDeviationExt: Iterator {
-    fn standard_deviation(self) -> Result<PositiveF64, EmptySequenceError>;
+    fn standard_deviation(self) -> Result<PositiveF64, StandardDeviationError>;
 }
 impl<T> FiniteStandardDeviationExt for T
 where
     T: Iterator<Item = FiniteF64> + Clone,
 {
-    fn standard_deviation(self) -> Result<PositiveF64, EmptySequenceError> {
-        self.map(|x| x.get())
+    fn standard_deviation(self) -> Result<PositiveF64, StandardDeviationError> {
+        let std_dev = self
+            .map(|x| x.get())
             .standard_deviation()
-            .map(|x| PositiveF64::new(x).unwrap())
+            .map_err(|_| StandardDeviationError::EmptySequence)?;
+        let Some(std_dev) = PositiveF64::new(std_dev) else {
+            return Err(StandardDeviationError::InfiniteNum);
+        };
+        Ok(std_dev)
     }
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum StandardDeviationError {
+    #[error("Empty sequence")]
+    EmptySequence,
+    #[error("Infinite number")]
+    InfiniteNum,
 }
 
 pub trait DistanceExt: Iterator<Item = (f64, f64)> + Sized {
@@ -112,6 +124,16 @@ mod tests {
 
         let empty: [f64; 0] = [];
         assert!(empty.iter().copied().mean().is_err());
+    }
+
+    #[test]
+    fn test_std_dev() {
+        let polarized = std::iter::repeat(f64::MIN)
+            .take(1 << 5)
+            .chain(std::iter::once(f64::MAX))
+            .map(|x| FiniteF64::new(x).unwrap());
+        let std_dev = polarized.standard_deviation();
+        assert!(std_dev.is_err());
     }
 
     #[test]

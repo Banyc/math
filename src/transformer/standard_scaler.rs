@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use strict_num::{FiniteF64, PositiveF64};
 use thiserror::Error;
 
-use crate::statistics::{EmptySequenceError, FiniteMeanExt, FiniteStandardDeviationExt};
+use crate::statistics::{FiniteMeanExt, FiniteStandardDeviationExt, StandardDeviationError};
 
 use super::{Estimate, Transform, Transformed};
 
@@ -13,7 +13,7 @@ pub type Standardized<I> = Transformed<I, StandardScaler>;
 pub struct StandardScalingEstimator;
 impl Estimate for StandardScalingEstimator {
     type Value = FiniteF64;
-    type Err = EmptySequenceError;
+    type Err = StandardDeviationError;
     type Output = StandardScaler;
 
     fn fit(
@@ -23,7 +23,9 @@ impl Estimate for StandardScalingEstimator {
     where
         Self: Sized,
     {
-        let mean = examples.clone().mean()?;
+        let Ok(mean) = examples.clone().mean() else {
+            return Err(Self::Err::EmptySequence);
+        };
         let standard_deviation = examples.standard_deviation()?;
         Ok(StandardScaler {
             mean,

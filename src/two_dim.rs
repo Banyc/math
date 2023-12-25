@@ -6,10 +6,7 @@ impl<I> VecZip<I> {
         Self { iterators }
     }
 }
-impl<I> Iterator for VecZip<I>
-where
-    I: Iterator,
-{
+impl<I: Iterator> Iterator for VecZip<I> {
     type Item = Vec<I::Item>;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -99,9 +99,7 @@ pub struct Fraction<I> {
 impl<I: Iterator<Item = f64>> Iterator for Fraction<I> {
     type Item = Option<Probability>;
     fn next(&mut self) -> Option<Self::Item> {
-        let Some(x) = self.iter.next() else {
-            return None;
-        };
+        let x = self.iter.next()?;
         Some(Probability::new(x / self.sum))
     }
 }

@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use strict_num::{FiniteF64, PositiveF64};
 use thiserror::Error;
 
-use crate::statistics::{FiniteMeanExt, FiniteStandardDeviationExt, StandardDeviationError};
+use crate::statistics::{
+    mean::FiniteMeanExt,
+    standard_deviation::{FiniteStandardDeviationExt, StandardDeviationError},
+};
 
 use super::{Estimate, Transform, Transformed};
 

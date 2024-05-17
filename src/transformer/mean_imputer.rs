@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use crate::statistics::{EmptySequenceError, MeanExt};
+use crate::statistics::{mean::MeanExt, EmptySequenceError};
 
 use super::{Estimate, Transform};
 

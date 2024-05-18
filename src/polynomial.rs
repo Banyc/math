@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::float_ext::FloatExt;
+use crate::float::FloatExt;
 use std::{fmt::Display, ops};
 
 #[derive(Debug, Error, Clone, Copy)]
@@ -57,7 +57,9 @@ impl Polynomial {
 
     /// find f(x) given
     ///
-    /// $$ f(x) = \sum_{i=1}^n y_i \cdot (\prod_{j \ne i} \frac{x - x_j}{x_i - x_j}) $$
+    /// ```math
+    /// f(x) = \sum_{i=1}^n y_i \cdot (\prod_{j \ne i} \frac{x - x_j}{x_i - x_j})
+    /// ```
     pub fn interpolate(points: &[Point]) -> Polynomial {
         assert!(!points.is_empty());
         // make sure $x_i$ is distinct
@@ -228,7 +230,7 @@ impl Display for Polynomial {
 
 #[cfg(test)]
 mod tests {
-    use crate::float_ext::FloatExt;
+    use crate::float::FloatExt;
 
     use super::*;
 

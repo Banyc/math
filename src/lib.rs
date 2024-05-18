@@ -1,5 +1,6 @@
-pub mod float_ext;
+pub mod float;
 pub mod graphics;
+pub mod lin_alg;
 pub mod ml;
 pub mod polynomial;
 pub mod prob;

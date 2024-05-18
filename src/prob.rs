@@ -1,6 +1,6 @@
 use strict_num::NormalizedF64;
 
-use crate::float_ext::FloatExt;
+use crate::float::FloatExt;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Probability(NormalizedF64);
@@ -115,7 +115,7 @@ impl<I: Iterator<Item = f64> + Clone> FractionExt for I {
 
 #[cfg(test)]
 mod tests {
-    use crate::float_ext::FloatExt;
+    use crate::float::FloatExt;
 
     use super::*;
 

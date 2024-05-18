@@ -13,7 +13,7 @@ pub fn sigmoid(x: f64) -> Probability {
 
 #[cfg(test)]
 mod tests {
-    use crate::float_ext::FloatExt;
+    use crate::float::FloatExt;
 
     use super::*;
 

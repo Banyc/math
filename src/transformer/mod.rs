@@ -40,7 +40,7 @@ pub trait TransformExt {
     /// not on the iterator itself.
     fn transform_by<V, T: Transform<V>>(self, transformer: T) -> Transformed<Self, T>
     where
-        Self: Sized,
+        Self: Iterator<Item = V> + Sized,
     {
         Transformed::new(self, transformer)
     }

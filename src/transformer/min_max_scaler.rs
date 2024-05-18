@@ -26,6 +26,29 @@ impl Default for MinMaxScalingEstimator {
         }
     }
 }
+impl Estimate<f64> for MinMaxScalingEstimator {
+    type Err = MinMaxScalingEstimateError2;
+    type Output = MinMaxScaler;
+
+    fn fit(&self, examples: impl Iterator<Item = f64> + Clone) -> Result<Self::Output, Self::Err>
+    where
+        Self: Sized,
+    {
+        let examples = examples
+            .map(FiniteF64::new)
+            .collect::<Option<Vec<FiniteF64>>>();
+        let examples = examples.ok_or(MinMaxScalingEstimateError2::InvalidInput)?;
+        self.fit(examples.iter().copied())
+            .map_err(MinMaxScalingEstimateError2::Inner)
+    }
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum MinMaxScalingEstimateError2 {
+    #[error("Invalid input")]
+    InvalidInput,
+    #[error("{0}")]
+    Inner(MinMaxScalingEstimateError),
+}
 impl Estimate<FiniteF64> for MinMaxScalingEstimator {
     type Err = MinMaxScalingEstimateError;
     type Output = MinMaxScaler;
@@ -80,6 +103,23 @@ pub struct MinMaxScaler {
     max: FiniteF64,
     range: std::ops::RangeInclusive<FiniteF64>,
 }
+impl Transform<f64> for MinMaxScaler {
+    type Err = MinMaxScalerError;
+
+    fn transform(&self, x: f64) -> Result<f64, Self::Err> {
+        let x = FiniteF64::new(x).ok_or(MinMaxScalerError::InvalidInput)?;
+        self.transform(x)
+            .map(|x| x.get())
+            .map_err(MinMaxScalerError::Inner)
+    }
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum MinMaxScalerError {
+    #[error("Invalid input")]
+    InvalidInput,
+    #[error("{0}")]
+    Inner(OutOfRange),
+}
 impl Transform<FiniteF64> for MinMaxScaler {
     type Err = OutOfRange;
 
@@ -113,7 +153,7 @@ mod tests {
             .unwrap();
         assert_eq!(scaler.max, 1.0);
         let transformed = examples.transform_by(scaler);
-        let x = transformed.collect::<Result<Vec<_>, _>>().unwrap();
+        let x = transformed.collect::<Result<Vec<FiniteF64>, _>>().unwrap();
         assert_eq!(x, [0.0, 0.25, 0.5, 1.0]);
     }
 

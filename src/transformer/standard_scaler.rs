@@ -14,6 +14,29 @@ pub type Standardized<I> = Transformed<I, StandardScaler>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StandardScalingEstimator;
+impl Estimate<f64> for StandardScalingEstimator {
+    type Err = StandardScalingEstimatorError;
+    type Output = StandardScaler;
+
+    fn fit(&self, examples: impl Iterator<Item = f64> + Clone) -> Result<Self::Output, Self::Err>
+    where
+        Self: Sized,
+    {
+        let examples = examples
+            .map(FiniteF64::new)
+            .collect::<Option<Vec<FiniteF64>>>();
+        let examples = examples.ok_or(StandardScalingEstimatorError::InvalidInput)?;
+        self.fit(examples.iter().copied())
+            .map_err(StandardScalingEstimatorError::Inner)
+    }
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum StandardScalingEstimatorError {
+    #[error("Invalid input")]
+    InvalidInput,
+    #[error("{0}")]
+    Inner(StandardDeviationError),
+}
 impl Estimate<FiniteF64> for StandardScalingEstimator {
     type Err = StandardDeviationError;
     type Output = StandardScaler;
@@ -51,6 +74,23 @@ impl StandardScaler {
             standard_deviation,
         }
     }
+}
+impl Transform<f64> for StandardScaler {
+    type Err = StandardScalerError;
+
+    fn transform(&self, x: f64) -> Result<f64, Self::Err> {
+        let x = FiniteF64::new(x).ok_or(StandardScalerError::InvalidInput)?;
+        self.transform(x)
+            .map(|x| x.get())
+            .map_err(StandardScalerError::Inner)
+    }
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum StandardScalerError {
+    #[error("Invalid input")]
+    InvalidInput,
+    #[error("{0}")]
+    Inner(InfiniteStandardizedNum),
 }
 impl Transform<FiniteF64> for StandardScaler {
     type Err = InfiniteStandardizedNum;

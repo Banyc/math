@@ -126,14 +126,6 @@ impl Matrix {
         PartialMatrix::new(self, start, end)
     }
 
-    pub fn alternate_signs(&mut self) {
-        let mut alt_sign = 1.;
-        for cell in &mut self.data {
-            *cell *= alt_sign;
-            alt_sign *= -1.;
-        }
-    }
-
     pub fn closes_to(&self, other: &Self) -> bool {
         self.assert_same_shape(other);
         for (a, b) in self.data.iter().copied().zip(other.data.iter().copied()) {
@@ -288,7 +280,15 @@ impl PartialMatrix<'_> {
 
     pub fn matrix_of_cofactors(&self) -> Matrix {
         let mut matrix = self.matrix_of_minors();
-        matrix.alternate_signs();
+        for row in 0..matrix.rows().get() {
+            for col in 0..matrix.cols().get() {
+                let is_even = (row + col) % 2 == 0;
+                let sign = if is_even { 1. } else { -1. };
+                let index = Index { row, col };
+                let value = matrix.cell(index);
+                matrix.set_cell(index, value * sign);
+            }
+        }
         matrix
     }
 
@@ -405,6 +405,22 @@ mod tests {
                 0.2, 0.2, 0., //
                 -0.2, 0.3, 1., //
                 0.2, -0.3, 0., //
+            ],
+        );
+        assert!(inverse.closes_to(&expected));
+
+        let data = vec![
+            2.0, 1.0, //
+            1.0, 1.0, //
+        ];
+        let rows = NonZeroUsize::new(2).unwrap();
+        let matrix = Matrix::new(rows, data);
+        let inverse = matrix.inverse();
+        let expected = Matrix::new(
+            rows,
+            vec![
+                1.0, -1.0, //
+                -1.0, 2.0, //
             ],
         );
         assert!(inverse.closes_to(&expected));

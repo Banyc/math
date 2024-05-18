@@ -26,14 +26,13 @@ impl Default for MinMaxScalingEstimator {
         }
     }
 }
-impl Estimate for MinMaxScalingEstimator {
+impl Estimate<FiniteF64> for MinMaxScalingEstimator {
     type Err = MinMaxScalingEstimateError;
-    type Value = FiniteF64;
     type Output = MinMaxScaler;
 
     fn fit(
         &self,
-        examples: impl Iterator<Item = Self::Value> + Clone,
+        examples: impl Iterator<Item = FiniteF64> + Clone,
     ) -> Result<Self::Output, Self::Err>
     where
         Self: Sized,
@@ -81,11 +80,10 @@ pub struct MinMaxScaler {
     max: FiniteF64,
     range: std::ops::RangeInclusive<FiniteF64>,
 }
-impl Transform for MinMaxScaler {
-    type Value = FiniteF64;
+impl Transform<FiniteF64> for MinMaxScaler {
     type Err = OutOfRange;
 
-    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+    fn transform(&self, x: FiniteF64) -> Result<FiniteF64, Self::Err> {
         if !(self.min..=self.max).contains(&x) {
             return Err(OutOfRange);
         }

@@ -6,15 +6,11 @@ use super::{Estimate, Transform};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MeanImputationEstimator;
-impl Estimate for MeanImputationEstimator {
+impl Estimate<f64> for MeanImputationEstimator {
     type Err = EmptySequenceError;
-    type Value = f64;
     type Output = MeanImputer;
 
-    fn fit(
-        &self,
-        examples: impl Iterator<Item = Self::Value> + Clone,
-    ) -> Result<Self::Output, Self::Err>
+    fn fit(&self, examples: impl Iterator<Item = f64> + Clone) -> Result<Self::Output, Self::Err>
     where
         Self: Sized,
     {
@@ -28,11 +24,10 @@ pub struct MeanImputer {
     mean: f64,
 }
 
-impl Transform for MeanImputer {
+impl Transform<f64> for MeanImputer {
     type Err = Infallible;
-    type Value = f64;
 
-    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+    fn transform(&self, x: f64) -> Result<f64, Self::Err> {
         if x.is_nan() {
             return Ok(self.mean);
         }
@@ -52,7 +47,7 @@ mod tests {
         let imp_mean = examples.into_iter().fit(&MeanImputationEstimator).unwrap();
         let examples = [2.0, f64::NAN, f64::NAN];
         let transformed = examples.into_iter().transform_by(imp_mean);
-        let x = transformed.collect::<Result<Vec<_>, _>>().unwrap();
+        let x = transformed.collect::<Result<Vec<f64>, _>>().unwrap();
         assert_eq!(x, [2.0, 3.5, 3.5]);
     }
 }

@@ -6,14 +6,13 @@ use super::{Estimate, Transform};
 
 #[derive(Debug, Clone, Copy)]
 pub struct ProportionScalingEstimator;
-impl Estimate for ProportionScalingEstimator {
-    type Value = PositiveF64;
+impl Estimate<PositiveF64> for ProportionScalingEstimator {
     type Err = InfiniteSum;
     type Output = ProportionScaler;
 
     fn fit(
         &self,
-        examples: impl Iterator<Item = Self::Value> + Clone,
+        examples: impl Iterator<Item = PositiveF64> + Clone,
     ) -> Result<Self::Output, Self::Err>
     where
         Self: Sized,
@@ -34,11 +33,10 @@ pub struct ProportionScaler {
     #[getset(get_copy = "pub")]
     sum: PositiveF64,
 }
-impl Transform for ProportionScaler {
-    type Value = PositiveF64;
+impl Transform<PositiveF64> for ProportionScaler {
     type Err = GreaterThanSum;
 
-    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+    fn transform(&self, x: PositiveF64) -> Result<PositiveF64, Self::Err> {
         if self.sum.get() < x.get() {
             return Err(GreaterThanSum);
         }

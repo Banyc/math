@@ -14,14 +14,13 @@ pub type Standardized<I> = Transformed<I, StandardScaler>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct StandardScalingEstimator;
-impl Estimate for StandardScalingEstimator {
-    type Value = FiniteF64;
+impl Estimate<FiniteF64> for StandardScalingEstimator {
     type Err = StandardDeviationError;
     type Output = StandardScaler;
 
     fn fit(
         &self,
-        examples: impl Iterator<Item = Self::Value> + Clone,
+        examples: impl Iterator<Item = FiniteF64> + Clone,
     ) -> Result<Self::Output, Self::Err>
     where
         Self: Sized,
@@ -53,11 +52,10 @@ impl StandardScaler {
         }
     }
 }
-impl Transform for StandardScaler {
-    type Value = FiniteF64;
+impl Transform<FiniteF64> for StandardScaler {
     type Err = InfiniteStandardizedNum;
 
-    fn transform(&self, x: Self::Value) -> Result<Self::Value, Self::Err> {
+    fn transform(&self, x: FiniteF64) -> Result<FiniteF64, Self::Err> {
         let scaled = x.get() / self.standard_deviation().get()
             - self.mean().get() / self.standard_deviation().get();
         let Some(scaled) = FiniteF64::new(scaled) else {

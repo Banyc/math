@@ -275,7 +275,7 @@ impl TTestParams {
         t.iter()
             .copied()
             .map(|t| {
-                statistics_inference::distributions::t::T_SCORE_TABLE.p_value_two_sided(self.df, t)
+                statistical_inference::distributions::t::T_SCORE_TABLE.p_value_two_sided(self.df, t)
             })
             .collect::<Vec<NormalizedF64>>()
     }

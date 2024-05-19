@@ -1,3 +1,6 @@
+[workspace]
+members = ["cli"]
+
 [package]
 name = "math"
 version = "0.1.0"
@@ -8,6 +11,6 @@ edition = "2021"
 [dependencies]
 getset = "0.1"
 serde = { version = "1", features = ["derive"] }
-statistics_inference = { git = "https://github.com/Banyc/statistics_inference.git", tag = "v0.0.1" }
+statistical_inference = { git = "https://github.com/Banyc/statistical_inference.git", tag = "v0.0.2" }
 strict-num = { version = "0.2", features = ["serde"] }
 thiserror = "1"

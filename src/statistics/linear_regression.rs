@@ -9,6 +9,8 @@ use crate::{
     transformer::Estimate,
 };
 
+use super::standard_deviation::StandardDeviationExt;
+
 pub trait Sample {
     fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone;
     fn response(&self) -> FiniteF64;
@@ -157,8 +159,8 @@ impl LinearRegression {
         Ok(sum)
     }
 
-    pub fn num_slopes(&self) -> NonZeroUsize {
-        NonZeroUsize::new(self.slopes.len()).unwrap()
+    pub fn slopes(&self) -> &Vec<f64> {
+        &self.slopes
     }
 }
 #[derive(Debug, Error, Clone, Copy)]
@@ -175,7 +177,7 @@ where
     V: Sample,
 {
     let n = examples.clone().count();
-    let k = model.num_slopes().get();
+    let k = model.slopes()[1..].len();
     let adjustment = (n - 1) as f64 / (n - k - 1) as f64;
     Ok(1. - standard_s_res(model, examples)? * adjustment)
 }
@@ -224,6 +226,49 @@ pub enum RSquareError {
     LinearRegression(LinearRegressionError),
 }
 
+/// Null hypothesis: $b_i = 0$
+///
+/// Exclude the intercept.
+pub fn t_test_params<V>(
+    model: &LinearRegression,
+    examples: impl Iterator<Item = V> + Clone,
+) -> Result<TTestParams, TTestParamsError>
+where
+    V: Sample,
+{
+    let mut s: Vec<f64> = vec![];
+    let k = model.slopes()[1..].len();
+    let n = examples.clone().count();
+    for i in 0..k {
+        let mut x_vec = vec![];
+        for example in examples.clone() {
+            let x = example.predictors().nth(i).unwrap();
+            x_vec.push(x.get());
+        }
+        let x_sdv = x_vec.iter().copied().standard_deviation().unwrap();
+        s.push(x_sdv);
+    }
+    let t_values: Vec<f64> = model.slopes()[1..]
+        .iter()
+        .copied()
+        .zip(s.iter().copied())
+        .map(|(b, s)| (b - 0.) / s)
+        .collect::<Vec<f64>>();
+    let df = n - k - 1;
+    let df = NonZeroUsize::new(df).ok_or(TTestParamsError::TooFewExamples)?;
+    Ok(TTestParams { t: t_values, df })
+}
+#[derive(Debug, Clone)]
+pub struct TTestParams {
+    pub t: Vec<f64>,
+    pub df: NonZeroUsize,
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum TTestParamsError {
+    #[error("too few examples")]
+    TooFewExamples,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::float::FloatExt;
@@ -262,6 +307,9 @@ mod tests {
         println!("{model:?}");
         assert!(model.slopes[0].closes_to(0.));
         assert!(model.slopes[1].closes_to(1.));
+
+        let r_squared = r_squared(&model, samples.iter()).unwrap();
+        println!("R-squared: {r_squared}");
     }
 
     #[test]
@@ -294,5 +342,7 @@ mod tests {
         println!("R-squared: {r_squared}");
         let adjusted_r_squared = adjusted_r_squared(&model, samples.iter()).unwrap();
         println!("adjusted R-squared: {adjusted_r_squared}");
+        let t_test_params = t_test_params(&model, samples.iter()).unwrap();
+        println!("T-test params: {t_test_params:?}");
     }
 }

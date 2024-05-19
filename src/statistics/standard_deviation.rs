@@ -1,7 +1,7 @@
 use strict_num::{FiniteF64, PositiveF64};
 use thiserror::Error;
 
-use crate::statistics::mean::MeanExt;
+use crate::statistics::variance::VarianceExt;
 
 use super::EmptySequenceError;
 
@@ -13,10 +13,7 @@ where
     T: Iterator<Item = f64> + Clone,
 {
     fn standard_deviation(self) -> Result<f64, EmptySequenceError> {
-        let mean = self.clone().mean()?;
-        let n: usize = self.clone().count();
-        let variance: f64 = self.map(|x| (x - mean).powi(2) / n as f64).sum();
-        Ok(variance.sqrt())
+        Ok(self.variance()?.sqrt())
     }
 }
 

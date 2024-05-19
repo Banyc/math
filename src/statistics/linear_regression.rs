@@ -5,11 +5,12 @@ use thiserror::Error;
 
 use crate::{
     lin_alg::{Index, Matrix},
+    statistics::variance::VarianceExt,
     transformer::Estimate,
 };
 
 pub trait Sample {
-    fn predictors(&self) -> impl Iterator<Item = FiniteF64>;
+    fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone;
     fn response(&self) -> FiniteF64;
 }
 
@@ -155,11 +156,72 @@ impl LinearRegression {
 
         Ok(sum)
     }
+
+    pub fn num_slopes(&self) -> NonZeroUsize {
+        NonZeroUsize::new(self.slopes.len()).unwrap()
+    }
 }
 #[derive(Debug, Error, Clone, Copy)]
 pub enum LinearRegressionError {
     #[error("number of predictors and slopes are not the same")]
     NumPredictorsNumSlopesMismatched,
+}
+
+pub fn adjusted_r_squared<V>(
+    model: &LinearRegression,
+    examples: impl Iterator<Item = V> + Clone,
+) -> Result<f64, RSquareError>
+where
+    V: Sample,
+{
+    let n = examples.clone().count();
+    let k = model.num_slopes().get();
+    let adjustment = (n - 1) as f64 / (n - k - 1) as f64;
+    Ok(1. - standard_s_res(model, examples)? * adjustment)
+}
+pub fn r_squared<V>(
+    model: &LinearRegression,
+    examples: impl Iterator<Item = V> + Clone,
+) -> Result<f64, RSquareError>
+where
+    V: Sample,
+{
+    Ok(1. - standard_s_res(model, examples)?)
+}
+fn standard_s_res<V>(
+    model: &LinearRegression,
+    examples: impl Iterator<Item = V> + Clone,
+) -> Result<f64, RSquareError>
+where
+    V: Sample,
+{
+    let responses = examples.clone().map(|example| example.response().get());
+    let s2_y = responses
+        .clone()
+        .variance()
+        .map_err(|_| RSquareError::EmptyExamples)?;
+    let predicted_responses: Vec<f64> = examples
+        .clone()
+        .map(|example| model.predict(example.predictors().map(|x| x.get())))
+        .collect::<Result<Vec<f64>, _>>()
+        .unwrap();
+    let residuals = predicted_responses
+        .iter()
+        .copied()
+        .zip(responses.clone())
+        .map(|(y_hat, y)| y - y_hat);
+    let s2_res = residuals
+        .clone()
+        .variance()
+        .map_err(|_| RSquareError::EmptyExamples)?;
+    Ok(s2_res / s2_y)
+}
+#[derive(Debug, Error, Clone, Copy)]
+pub enum RSquareError {
+    #[error("no examples")]
+    EmptyExamples,
+    #[error("{0}")]
+    LinearRegression(LinearRegressionError),
 }
 
 #[cfg(test)]
@@ -173,7 +235,7 @@ mod tests {
         pub y: FiniteF64,
     }
     impl Sample for &TheSample {
-        fn predictors(&self) -> impl Iterator<Item = FiniteF64> {
+        fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone {
             self.x.iter().copied()
         }
 
@@ -212,13 +274,14 @@ mod tests {
             (vec![10.21], 8.65),
         ];
         let samples = samples
-            .into_iter()
+            .iter()
             .map(|(x, y)| TheSample {
-                x: x.into_iter()
+                x: x.iter()
+                    .copied()
                     .map(FiniteF64::new)
                     .collect::<Option<Vec<FiniteF64>>>()
                     .unwrap(),
-                y: FiniteF64::new(y).unwrap(),
+                y: FiniteF64::new(*y).unwrap(),
             })
             .collect::<Vec<TheSample>>();
         let estimator = LinearRegressionEstimator;
@@ -226,5 +289,10 @@ mod tests {
         println!("{model:?}");
         assert!(f64::abs(model.slopes[0] - 2.034) < 0.001);
         assert!(f64::abs(model.slopes[1] - 0.5615) < 0.001);
+
+        let r_squared = r_squared(&model, samples.iter()).unwrap();
+        println!("R-squared: {r_squared}");
+        let adjusted_r_squared = adjusted_r_squared(&model, samples.iter()).unwrap();
+        println!("adjusted R-squared: {adjusted_r_squared}");
     }
 }

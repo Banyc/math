@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use clap::Args;
 use dfplot::io::read_df_file;
 use math::{
+    iter::AssertIteratorItemExt,
     statistics::lin_regr::{adjusted_r_squared, t_test_params, LinearRegressionEstimator, Sample},
     transformer::Estimate,
     two_dim::VecZip,
@@ -23,15 +24,10 @@ impl LinRegrArgs {
         let df = read_df_file(self.input)?;
 
         let mut columns = vec![];
-        columns.extend(self.x.iter());
-        columns.push(&self.y);
+        columns.extend(self.x.iter().map(|s| col(s)));
+        columns.push(col(&self.y));
 
-        let mut expressions = vec![];
-        for column in &columns {
-            expressions.push(col(column.as_str()));
-        }
-
-        let df = df.select(&expressions).collect()?;
+        let df = df.select(&columns).collect()?;
 
         let mut columns = vec![];
         let y_column = df
@@ -48,15 +44,16 @@ impl LinRegrArgs {
         let zip = VecZip::new(columns);
 
         let examples = zip
-            .filter_map(|columns| columns.into_iter().collect::<Option<Vec<f64>>>())
             .filter_map(|columns| {
                 columns
                     .into_iter()
-                    .map(FiniteF64::new)
+                    .assert_item::<Option<f64>>()
+                    .map(|column| column.and_then(FiniteF64::new))
+                    .assert_item::<Option<FiniteF64>>()
                     .collect::<Option<Vec<FiniteF64>>>()
             })
             .map(|columns| {
-                let mut columns = columns.into_iter();
+                let mut columns = columns.into_iter().assert_item::<FiniteF64>();
                 let y = columns.next().unwrap();
                 let x = columns.collect::<Vec<FiniteF64>>();
                 Example { x, y }

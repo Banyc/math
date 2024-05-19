@@ -1,5 +1,6 @@
 pub mod float;
 pub mod graphics;
+pub mod iter;
 pub mod lin_alg;
 pub mod ml;
 pub mod polynomial;

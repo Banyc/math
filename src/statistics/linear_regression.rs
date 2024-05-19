@@ -1,4 +1,4 @@
-use std::num::NonZeroUsize;
+use std::{collections::HashMap, num::NonZeroUsize};
 
 use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
@@ -51,9 +51,8 @@ where
                 .sum();
             x_sums.push(sum);
         }
-        let mut x_x_sums: Vec<Vec<f64>> = vec![];
+        let mut x_x_sums: HashMap<(usize, usize), f64> = HashMap::new();
         for first in 0..k {
-            let mut row = vec![];
             for second in 0..k {
                 if second < first {
                     continue;
@@ -66,9 +65,8 @@ where
                             * example.predictors().nth(second).unwrap().get()
                     })
                     .sum();
-                row.push(sum);
+                x_x_sums.insert((first, second), sum);
             }
-            x_x_sums.push(row);
         }
 
         let y_sum: f64 = examples
@@ -103,7 +101,7 @@ where
                 }
                 let min = min - 1;
                 let max = max - 1;
-                XTX_data.push(x_x_sums[min][max]);
+                XTX_data.push(*x_x_sums.get(&(min, max)).unwrap());
             }
         }
         let XTX = Matrix::new(XTX_rows, XTX_data);

@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use strict_num::FiniteF64;
+use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
 
 use crate::{
@@ -263,6 +263,23 @@ pub struct TTestParams {
     pub t: Vec<f64>,
     pub df: NonZeroUsize,
 }
+impl TTestParams {
+    pub fn two_sided_p_values(&self) -> Vec<NormalizedF64> {
+        let t = self
+            .t
+            .iter()
+            .copied()
+            .map(FiniteF64::new)
+            .collect::<Option<Vec<FiniteF64>>>()
+            .unwrap();
+        t.iter()
+            .copied()
+            .map(|t| {
+                statistics_inference::distributions::t::T_SCORE_TABLE.p_value_two_sided(self.df, t)
+            })
+            .collect::<Vec<NormalizedF64>>()
+    }
+}
 #[derive(Debug, Error, Clone, Copy)]
 pub enum TTestParamsError {
     #[error("too few examples")]
@@ -344,5 +361,9 @@ mod tests {
         println!("adjusted R-squared: {adjusted_r_squared}");
         let t_test_params = t_test_params(&model, samples.iter()).unwrap();
         println!("T-test params: {t_test_params:?}");
+        println!(
+            "two-sided p values: {:?}",
+            t_test_params.two_sided_p_values()
+        );
     }
 }

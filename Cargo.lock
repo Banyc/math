@@ -26,9 +26,16 @@ version = "0.1.0"
 dependencies = [
  "getset",
  "serde",
+ "statistics_inference",
  "strict-num",
  "thiserror",
 ]
+
+[[package]]
+name = "once_cell"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
 name = "proc-macro-error"
@@ -73,6 +80,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "reikna"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "587f2b12c725829d56d8192817535cbfe3c4b5daf294622765cec5969d980eca"
+
+[[package]]
 name = "serde"
 version = "1.0.202"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -90,6 +103,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.64",
+]
+
+[[package]]
+name = "statistics_inference"
+version = "0.1.0"
+source = "git+https://github.com/Banyc/statistics_inference.git?tag=v0.0.1#b267fb905d177d5ac74a98dfd0bef9c46015dba0"
+dependencies = [
+ "once_cell",
+ "reikna",
+ "strict-num",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 pub mod distance;
-pub mod linear_regression;
+pub mod lin_regr;
 pub mod mean;
 pub mod standard_deviation;
 pub mod variance;

@@ -22,7 +22,7 @@ impl<V> Estimate<V> for LinearRegressionEstimator
 where
     V: Sample,
 {
-    type Err = LinearRegressionEstimatorError;
+    type Err = ExamplesError;
     type Output = LinearRegression;
 
     #[allow(non_snake_case)]
@@ -30,51 +30,16 @@ where
     where
         Self: Sized,
     {
-        let first: V = examples
-            .clone()
-            .next()
-            .ok_or(LinearRegressionEstimatorError::EmptyExamples)?;
-        let k: usize = first.predictors().count();
-        for example in examples.clone() {
-            if example.predictors().count() != k {
-                return Err(LinearRegressionEstimatorError::NumPredictorsNotConstant);
-            }
-        }
+        let XTX_inv = XTX_inv(examples.clone())?;
 
-        let n: usize = examples.clone().count();
-
-        let mut x_sums: Vec<f64> = vec![];
-        for i in 0..k {
-            let sum: f64 = examples
-                .clone()
-                .map(|example| example.predictors().nth(i).unwrap().get())
-                .sum();
-            x_sums.push(sum);
-        }
-        let mut x_x_sums: HashMap<(usize, usize), f64> = HashMap::new();
-        for first in 0..k {
-            for second in 0..k {
-                if second < first {
-                    continue;
-                }
-
-                let sum: f64 = examples
-                    .clone()
-                    .map(|example| {
-                        example.predictors().nth(first).unwrap().get()
-                            * example.predictors().nth(second).unwrap().get()
-                    })
-                    .sum();
-                x_x_sums.insert((first, second), sum);
-            }
-        }
+        let k: NonZeroUsize = num_predictor_variables(examples.clone())?;
 
         let y_sum: f64 = examples
             .clone()
             .map(|example| example.response().get())
             .sum();
         let mut x_y_sums: Vec<f64> = vec![];
-        for i in 0..k {
+        for i in 0..k.get() {
             let sum: f64 = examples
                 .clone()
                 .map(|example| {
@@ -84,33 +49,10 @@ where
             x_y_sums.push(sum);
         }
 
-        let XTX_rows = NonZeroUsize::new(k + 1).unwrap();
-        let mut XTX_data = vec![];
-        for first in 0..XTX_rows.get() {
-            for second in 0..XTX_rows.get() {
-                if first == 0 && second == 0 {
-                    XTX_data.push(n as f64);
-                    continue;
-                }
-                let min = first.min(second);
-                let max = first.max(second);
-                if min == 0 {
-                    let i = max - 1;
-                    XTX_data.push(x_sums[i]);
-                    continue;
-                }
-                let min = min - 1;
-                let max = max - 1;
-                XTX_data.push(*x_x_sums.get(&(min, max)).unwrap());
-            }
-        }
-        let XTX = Matrix::new(XTX_rows, XTX_data);
-        let XTX_inv = XTX.inverse();
-
         let mut XTy_data = vec![];
         XTy_data.push(y_sum);
         XTy_data.extend(x_y_sums.iter().copied());
-        let XTy_rows = NonZeroUsize::new(k + 1).unwrap();
+        let XTy_rows = NonZeroUsize::new(k.get() + 1).unwrap();
         let XTy = Matrix::new(XTy_rows, XTy_data);
 
         let b = XTX_inv.mul_matrix(&XTy);
@@ -123,16 +65,98 @@ where
         Ok(LinearRegression::new(slopes))
     }
 }
+
+fn num_predictor_variables<V>(
+    examples: impl Iterator<Item = V> + Clone,
+) -> Result<NonZeroUsize, ExamplesError>
+where
+    V: Sample,
+{
+    let first: V = examples
+        .clone()
+        .next()
+        .ok_or(ExamplesError::EmptyExamples)?;
+    let k: usize = first.predictors().count();
+    for example in examples.clone() {
+        if example.predictors().count() != k {
+            return Err(ExamplesError::NumPredictorsNotConstant);
+        }
+    }
+    Ok(NonZeroUsize::new(k).unwrap())
+}
 #[derive(Debug, Error, Clone, Copy)]
-pub enum LinearRegressionEstimatorError {
+pub enum ExamplesError {
     #[error("number of predictors is not constant")]
     NumPredictorsNotConstant,
     #[error("no examples")]
     EmptyExamples,
 }
 
+#[allow(non_snake_case)]
+fn XTX_inv<V>(examples: impl Iterator<Item = V> + Clone) -> Result<Matrix, ExamplesError>
+where
+    V: Sample,
+{
+    let k: NonZeroUsize = num_predictor_variables(examples.clone())?;
+    let n: usize = examples.clone().count();
+
+    let mut x_sums: Vec<f64> = vec![];
+    for i in 0..k.get() {
+        let sum: f64 = examples
+            .clone()
+            .map(|example| example.predictors().nth(i).unwrap().get())
+            .sum();
+        x_sums.push(sum);
+    }
+    let mut x_x_sums: HashMap<(usize, usize), f64> = HashMap::new();
+    for first in 0..k.get() {
+        for second in 0..k.get() {
+            if second < first {
+                continue;
+            }
+
+            let sum: f64 = examples
+                .clone()
+                .map(|example| {
+                    example.predictors().nth(first).unwrap().get()
+                        * example.predictors().nth(second).unwrap().get()
+                })
+                .sum();
+            x_x_sums.insert((first, second), sum);
+        }
+    }
+
+    let XTX_rows = NonZeroUsize::new(k.get() + 1).unwrap();
+    let mut XTX_data = vec![];
+    for first in 0..XTX_rows.get() {
+        for second in 0..XTX_rows.get() {
+            if first == 0 && second == 0 {
+                XTX_data.push(n as f64);
+                continue;
+            }
+            let min = first.min(second);
+            let max = first.max(second);
+            if min == 0 {
+                let i = max - 1;
+                XTX_data.push(x_sums[i]);
+                continue;
+            }
+            let min = min - 1;
+            let max = max - 1;
+            XTX_data.push(*x_x_sums.get(&(min, max)).unwrap());
+        }
+    }
+    let XTX = Matrix::new(XTX_rows, XTX_data);
+    Ok(XTX.inverse())
+}
+
 #[derive(Debug, Clone)]
 pub struct LinearRegression {
+    /// ```math
+    /// (b_0, b_1, ..., b_k)
+    /// ```
+    ///
+    /// - $k$: the number of predictor variables
     slopes: Vec<f64>,
 }
 impl LinearRegression {
@@ -170,7 +194,7 @@ pub enum LinearRegressionError {
 pub fn adjusted_r_squared<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, RSquareError>
+) -> Result<f64, RSquaredError>
 where
     V: Sample,
 {
@@ -182,7 +206,7 @@ where
 pub fn r_squared<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, RSquareError>
+) -> Result<f64, RSquaredError>
 where
     V: Sample,
 {
@@ -191,7 +215,7 @@ where
 fn standard_s_res<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, RSquareError>
+) -> Result<f64, RSquaredError>
 where
     V: Sample,
 {
@@ -199,34 +223,45 @@ where
     let s2_y = responses
         .clone()
         .variance()
-        .map_err(|_| RSquareError::EmptyExamples)?;
-    let predicted_responses: Vec<f64> = examples
-        .clone()
-        .map(|example| model.predict(example.predictors().map(|x| x.get())))
-        .collect::<Result<Vec<f64>, _>>()
-        .unwrap();
-    let residuals = predicted_responses
+        .map_err(|_| RSquaredError::EmptyExamples)?;
+    let residuals = residuals(model, examples.clone());
+    let s2_res = residuals
         .iter()
         .copied()
-        .zip(responses.clone())
-        .map(|(y_hat, y)| y - y_hat);
-    let s2_res = residuals
-        .clone()
         .variance()
-        .map_err(|_| RSquareError::EmptyExamples)?;
+        .map_err(|_| RSquaredError::EmptyExamples)?;
     Ok(s2_res / s2_y)
 }
 #[derive(Debug, Error, Clone, Copy)]
-pub enum RSquareError {
+pub enum RSquaredError {
     #[error("no examples")]
     EmptyExamples,
     #[error("{0}")]
     LinearRegression(LinearRegressionError),
 }
 
+fn residuals<V>(model: &LinearRegression, examples: impl Iterator<Item = V> + Clone) -> Vec<f64>
+where
+    V: Sample,
+{
+    let responses = examples.clone().map(|example| example.response().get());
+    let predicted_responses: Vec<f64> = examples
+        .clone()
+        .map(|example| model.predict(example.predictors().map(|x| x.get())))
+        .collect::<Result<Vec<f64>, _>>()
+        .unwrap();
+    predicted_responses
+        .iter()
+        .copied()
+        .zip(responses.clone())
+        .map(|(y_hat, y)| y - y_hat)
+        .collect::<Vec<f64>>()
+}
+
 /// Null hypothesis: $b_i = 0$
 ///
 /// Exclude the intercept.
+#[allow(non_snake_case)]
 pub fn t_test_params<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
@@ -234,30 +269,38 @@ pub fn t_test_params<V>(
 where
     V: Sample,
 {
-    let mut s: Vec<f64> = vec![];
     let k = model.slopes()[1..].len();
     let n = examples.clone().count();
-    for i in 0..k {
-        let mut x_vec = vec![];
-        for example in examples.clone() {
-            let x = example.predictors().nth(i).unwrap();
-            x_vec.push(x.get());
-        }
-        let x_sdv = x_vec.iter().copied().standard_deviation().unwrap();
-        s.push(x_sdv);
+    let residuals = residuals(model, examples.clone());
+    let residual_standard_error: f64 = residuals.iter().copied().standard_deviation().unwrap();
+
+    let XTX_inv = XTX_inv(examples.clone()).map_err(TTestParamsError::Examples)?;
+    let mut slope_standard_errors = vec![];
+    for i in 1..=k {
+        let index = Index { row: i, col: i };
+        let value = XTX_inv.cell(index);
+        let se = residual_standard_error * value.sqrt();
+        slope_standard_errors.push(se);
     }
     let t_values: Vec<f64> = model.slopes()[1..]
         .iter()
         .copied()
-        .zip(s.iter().copied())
-        .map(|(b, s)| (b - 0.) / s)
+        .zip(slope_standard_errors.iter().copied())
+        .map(|(b, se)| (b - 0.) / se)
         .collect::<Vec<f64>>();
     let df = n - k - 1;
     let df = NonZeroUsize::new(df).ok_or(TTestParamsError::TooFewExamples)?;
-    Ok(TTestParams { t: t_values, df })
+    Ok(TTestParams {
+        residual_standard_error,
+        slope_standard_errors,
+        t: t_values,
+        df,
+    })
 }
 #[derive(Debug, Clone)]
 pub struct TTestParams {
+    pub residual_standard_error: f64,
+    pub slope_standard_errors: Vec<f64>,
     pub t: Vec<f64>,
     pub df: NonZeroUsize,
 }
@@ -282,6 +325,8 @@ impl TTestParams {
 pub enum TTestParamsError {
     #[error("too few examples")]
     TooFewExamples,
+    #[error("{0}")]
+    Examples(ExamplesError),
 }
 
 #[cfg(test)]
@@ -358,7 +403,69 @@ mod tests {
         let adjusted_r_squared = adjusted_r_squared(&model, samples.iter()).unwrap();
         println!("adjusted R-squared: {adjusted_r_squared}");
         let t_test_params = t_test_params(&model, samples.iter()).unwrap();
-        println!("T-test params: {t_test_params:?}");
+        println!("{t_test_params:?}");
+        println!(
+            "two-sided p values: {:?}",
+            t_test_params.two_sided_p_values()
+        );
+    }
+
+    /// ref: <https://ecampusontario.pressbooks.pub/introstats/chapter/13-3-standard-error-of-the-estimate/>
+    #[test]
+    fn test_fit_3() {
+        let samples = [
+            (vec![3., 23., 60.], 4.),
+            (vec![8., 32., 114.], 5.),
+            (vec![9., 28., 45.], 2.),
+            (vec![4., 60., 187.], 6.),
+            (vec![3., 62., 175.], 7.),
+            (vec![1., 43., 125.], 8.),
+            (vec![6., 60., 93.], 7.),
+            (vec![3., 37., 57.], 3.),
+            (vec![2., 24., 47.], 5.),
+            (vec![5., 64., 128.], 5.),
+            (vec![2., 28., 66.], 7.),
+            (vec![1., 66., 146.], 8.),
+            (vec![7., 35., 89.], 5.),
+            (vec![5., 37., 56.], 2.),
+            (vec![0., 59., 65.], 4.),
+            (vec![2., 32., 95.], 6.),
+            (vec![6., 76., 82.], 5.),
+            (vec![5., 25., 90.], 7.),
+            (vec![0., 55., 137.], 9.),
+            (vec![3., 34., 91.], 8.),
+            (vec![5., 54., 184.], 7.),
+            (vec![1., 57., 60.], 9.),
+            (vec![0., 68., 39.], 7.),
+            (vec![2., 66., 187.], 10.),
+            (vec![0., 50., 49.], 5.),
+        ];
+        let samples = samples
+            .iter()
+            .map(|(x, y)| TheSample {
+                x: x.iter()
+                    .copied()
+                    .map(FiniteF64::new)
+                    .collect::<Option<Vec<FiniteF64>>>()
+                    .unwrap(),
+                y: FiniteF64::new(*y).unwrap(),
+            })
+            .collect::<Vec<TheSample>>();
+        let estimator = LinearRegressionEstimator;
+        let model = estimator.fit(samples.iter()).unwrap();
+        println!("{model:?}");
+        assert!(f64::abs(model.slopes[0] - 4.7993) < 0.001);
+        assert!(f64::abs(model.slopes[1] - -0.3818) < 0.001);
+        assert!(f64::abs(model.slopes[2] - 0.0046) < 0.001);
+        assert!(f64::abs(model.slopes[3] - 0.0233) < 0.001);
+
+        let r_squared = r_squared(&model, samples.iter()).unwrap();
+        assert!(r_squared.closes_to(0.506629665));
+        let adjusted_r_squared = adjusted_r_squared(&model, samples.iter()).unwrap();
+        assert!(adjusted_r_squared.closes_to(0.436148189));
+        let t_test_params = t_test_params(&model, samples.iter()).unwrap();
+        assert_eq!(t_test_params.df.get(), 21);
+        println!("{t_test_params:?}");
         println!(
             "two-sided p values: {:?}",
             t_test_params.two_sided_p_values()

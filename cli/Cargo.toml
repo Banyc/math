@@ -1,10 +1,12 @@
 [package]
-name = "cli"
+name = "math_cli"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-dfplot = { git = "https://github.com/Banyc/dfplot.git", tag = "v0.0.7" }
+dfplot = { git = "https://github.com/Banyc/dfplot.git", tag = "v0.0.8" }
 math = { path = "../" }
+polars = { version = "0.39" }
+strict-num = "0.2"

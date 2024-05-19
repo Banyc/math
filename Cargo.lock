@@ -334,16 +334,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "dfplot",
- "math 0.1.0",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -515,12 +505,12 @@ dependencies = [
 [[package]]
 name = "dfplot"
 version = "0.1.0"
-source = "git+https://github.com/Banyc/dfplot.git?tag=v0.0.7#a0f865cdb7cf26d9c7baabdc5ee015dc034133f8"
+source = "git+https://github.com/Banyc/dfplot.git?tag=v0.0.8#aaa30848d13c10b1aec5c57d205dbd71578ec2da"
 dependencies = [
  "anyhow",
  "clap",
  "itertools",
- "math 0.1.0 (git+https://github.com/Banyc/math.git?tag=v0.0.2)",
+ "math 0.1.0 (git+https://github.com/Banyc/math.git?tag=v0.0.4)",
  "plotly",
  "polars",
  "strict-num",
@@ -922,7 +912,7 @@ version = "0.1.0"
 dependencies = [
  "getset",
  "serde",
- "statistical_inference",
+ "statistical_inference 0.1.0 (git+https://github.com/Banyc/statistical_inference.git?tag=v0.0.3)",
  "strict-num",
  "thiserror",
 ]
@@ -930,12 +920,25 @@ dependencies = [
 [[package]]
 name = "math"
 version = "0.1.0"
-source = "git+https://github.com/Banyc/math.git?tag=v0.0.2#92ef9789b7ae631d177c82b4fb1f6842fb3cbb23"
+source = "git+https://github.com/Banyc/math.git?tag=v0.0.4#3b7d1d2aa3b55fac4960fb77e7e5f326ec41d07c"
 dependencies = [
  "getset",
  "serde",
+ "statistical_inference 0.1.0 (git+https://github.com/Banyc/statistical_inference.git?tag=v0.0.2)",
  "strict-num",
  "thiserror",
+]
+
+[[package]]
+name = "math_cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "dfplot",
+ "math 0.1.0",
+ "polars",
+ "strict-num",
 ]
 
 [[package]]
@@ -1942,6 +1945,16 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 name = "statistical_inference"
 version = "0.1.0"
 source = "git+https://github.com/Banyc/statistical_inference.git?tag=v0.0.2#b50e04c61ed2566b6b606ffdbc9ba7bdcc275934"
+dependencies = [
+ "once_cell",
+ "reikna",
+ "strict-num",
+]
+
+[[package]]
+name = "statistical_inference"
+version = "0.1.0"
+source = "git+https://github.com/Banyc/statistical_inference.git?tag=v0.0.3#e7af02a9adebf3ec21e2adcb84db679e25ae8c9b"
 dependencies = [
  "once_cell",
  "reikna",

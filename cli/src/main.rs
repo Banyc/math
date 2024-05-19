@@ -1,5 +1,5 @@
 use clap::Parser;
-use cli::Cli;
+use math_cli::Cli;
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();

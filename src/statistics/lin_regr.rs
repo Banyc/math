@@ -10,7 +10,7 @@ use crate::{
     transformer::Estimate,
 };
 
-use super::standard_deviation::StandardDeviationExt;
+use super::{standard_deviation::StandardDeviationExt, EmptySequenceError};
 
 pub trait Sample {
     fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone;
@@ -195,7 +195,7 @@ pub enum LinearRegressionError {
 pub fn adjusted_r_squared<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, RSquaredError>
+) -> Result<f64, EmptySequenceError>
 where
     V: Sample,
 {
@@ -207,7 +207,7 @@ where
 pub fn r_squared<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, RSquaredError>
+) -> Result<f64, EmptySequenceError>
 where
     V: Sample,
 {
@@ -216,29 +216,15 @@ where
 fn standard_s2_res<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, RSquaredError>
+) -> Result<f64, EmptySequenceError>
 where
     V: Sample,
 {
     let responses = examples.clone().map(|example| example.response().get());
-    let s2_y = responses
-        .clone()
-        .variance()
-        .map_err(|_| RSquaredError::EmptyExamples)?;
+    let s2_y = responses.clone().variance()?;
     let residuals = residuals(model, examples.clone());
-    let s2_res = residuals
-        .iter()
-        .copied()
-        .variance()
-        .map_err(|_| RSquaredError::EmptyExamples)?;
+    let s2_res = residuals.iter().copied().variance()?;
     Ok(s2_res / s2_y)
-}
-#[derive(Debug, Error, Clone, Copy)]
-pub enum RSquaredError {
-    #[error("no examples")]
-    EmptyExamples,
-    #[error("{0}")]
-    LinearRegression(LinearRegressionError),
 }
 
 fn residuals<V>(model: &LinearRegression, examples: impl Iterator<Item = V> + Clone) -> Vec<f64>

@@ -4,6 +4,7 @@ use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
 
 use crate::{
+    iter::AssertIteratorItemExt,
     lin_alg::{Index, Matrix},
     statistics::variance::VarianceExt,
     transformer::Estimate,
@@ -201,7 +202,7 @@ where
     let n = examples.clone().count();
     let k = model.slopes()[1..].len();
     let adjustment = (n - 1) as f64 / (n - k - 1) as f64;
-    Ok(1. - standard_s_res(model, examples)? * adjustment)
+    Ok(1. - standard_s2_res(model, examples)? * adjustment)
 }
 pub fn r_squared<V>(
     model: &LinearRegression,
@@ -210,9 +211,9 @@ pub fn r_squared<V>(
 where
     V: Sample,
 {
-    Ok(1. - standard_s_res(model, examples)?)
+    Ok(1. - standard_s2_res(model, examples)?)
 }
-fn standard_s_res<V>(
+fn standard_s2_res<V>(
     model: &LinearRegression,
     examples: impl Iterator<Item = V> + Clone,
 ) -> Result<f64, RSquaredError>
@@ -245,14 +246,15 @@ where
     V: Sample,
 {
     let responses = examples.clone().map(|example| example.response().get());
-    let predicted_responses: Vec<f64> = examples
+    let predicted_responses = examples
         .clone()
-        .map(|example| model.predict(example.predictors().map(|x| x.get())))
-        .collect::<Result<Vec<f64>, _>>()
-        .unwrap();
+        .map(|example| {
+            model
+                .predict(example.predictors().map(|x| x.get()))
+                .unwrap()
+        })
+        .assert_item::<f64>();
     predicted_responses
-        .iter()
-        .copied()
         .zip(responses.clone())
         .map(|(y_hat, y)| y - y_hat)
         .collect::<Vec<f64>>()

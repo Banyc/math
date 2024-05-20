@@ -1,3 +1,20 @@
+/// # Example
+///
+/// ```rust
+/// use math::two_dim::VecZip;
+///
+/// let data = vec![
+///     vec![1, 2],
+///     vec![3, 4],
+/// ];
+/// let data = data.into_iter().map(|column| column.into_iter()).collect::<Vec<_>>();
+/// let zip = VecZip::new(data);
+/// let data = zip.collect::<Vec<Vec<usize>>>();
+/// assert_eq!(data, vec![
+///     vec![1, 3],
+///     vec![2, 4],
+/// ]);
+/// ```
 pub struct VecZip<I> {
     iterators: Vec<I>,
 }

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
+use banyc_polars_util::read_df_file;
 use clap::Args;
-use dfplot::io::read_df_file;
 use math::{
     iter::AssertIteratorItemExt,
     statistics::lin_regr::{adjusted_r_squared, t_test_params, LinearRegressionEstimator, Sample},

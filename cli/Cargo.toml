@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-banyc_polars_util = { git = "https://github.com/Banyc/banyc_polars_util.git", tag = "v0.0.2" }
+banyc_polars_util = { version = "0.1" }
 clap = { version = "4", features = ["derive"] }
 math = { path = "../" }
 polars = { version = "0.40" }

@@ -10,13 +10,13 @@ impl<const N: usize> Vector<N> {
     pub fn new(dims: [FiniteF64; N]) -> Self {
         Self { dims }
     }
+    pub fn dims(&self) -> &[FiniteF64; N] {
+        &self.dims
+    }
 
     pub fn add(&self, other: &Self) -> Self {
         let dims = self
-            .dims
-            .iter()
-            .copied()
-            .zip(other.dims.iter().copied())
+            .pairwise(other)
             .map(|(a, b)| a.get() + b.get())
             .map(|x| FiniteF64::new(x).unwrap())
             .collect::<Vec<FiniteF64>>();
@@ -25,10 +25,7 @@ impl<const N: usize> Vector<N> {
     }
     pub fn sub(&self, other: &Self) -> Self {
         let dims = self
-            .dims
-            .iter()
-            .copied()
-            .zip(other.dims.iter().copied())
+            .pairwise(other)
             .map(|(a, b)| a.get() - b.get())
             .map(|x| FiniteF64::new(x).unwrap())
             .collect::<Vec<FiniteF64>>();
@@ -36,12 +33,15 @@ impl<const N: usize> Vector<N> {
         Self { dims }
     }
     pub fn dot(&self, other: &Self) -> f64 {
-        self.dims
-            .iter()
-            .copied()
-            .zip(other.dims.iter().copied())
+        self.pairwise(other)
             .map(|(a, b)| a.get() * b.get())
             .sum::<f64>()
+    }
+    fn pairwise<'a>(
+        &'a self,
+        other: &'a Self,
+    ) -> impl Iterator<Item = (FiniteF64, FiniteF64)> + 'a {
+        self.dims.iter().copied().zip(other.dims.iter().copied())
     }
     pub fn mul(&mut self, other: f64) {
         self.dims
@@ -72,10 +72,7 @@ impl<const N: usize> Vector<N> {
     }
     pub fn lerp(&self, other: &Self, t: NormalizedF64) -> Self {
         let dims = self
-            .dims
-            .iter()
-            .copied()
-            .zip(other.dims.iter().copied())
+            .pairwise(other)
             .map(|(a, b)| lerp(&(a.get()..=b.get()), Probability::new(t.get()).unwrap()))
             .map(|x| FiniteF64::new(x).unwrap())
             .collect::<Vec<FiniteF64>>();

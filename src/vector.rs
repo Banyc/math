@@ -87,10 +87,39 @@ impl<const N: usize> Vector<N> {
         let dims = dims.try_into().unwrap();
         Self { dims }
     }
+    #[must_use]
+    pub fn heading_angle(&self, adjacent_axis: usize, opposite_axis: usize) -> f64 {
+        let adj = self.dims[adjacent_axis];
+        let opp = self.dims[opposite_axis];
+        f64::atan2(opp.get(), adj.get())
+    }
+    pub fn rotate(&mut self, adjacent_axis: usize, opposite_axis: usize, angle: f64) {
+        let cos = angle.cos();
+        let sin = angle.sin();
+        let x = self.dims[adjacent_axis];
+        let y = self.dims[opposite_axis];
+        let x_ = cos * x.get() + -sin * y.get();
+        let y_ = sin * x.get() + cos * y.get();
+        self.dims[adjacent_axis] = FiniteF64::new(x_).unwrap();
+        self.dims[opposite_axis] = FiniteF64::new(y_).unwrap();
+    }
+}
+impl Vector<2> {
+    #[must_use]
+    pub fn heading_angle_2d(&self) -> f64 {
+        self.heading_angle(0, 1)
+    }
+    pub fn rotate_2d(&mut self, angle: f64) {
+        self.rotate(0, 1, angle)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::f64::consts::PI;
+
+    use crate::float::FloatExt;
+
     use super::*;
 
     #[test]
@@ -99,5 +128,25 @@ mod tests {
         let b = Vector::new([1., 2.].map(|x| FiniteF64::new(x).unwrap()));
         let c = a.add(&b);
         assert_eq!(c.dims, [1., 3.].map(|x| FiniteF64::new(x).unwrap()));
+    }
+
+    #[test]
+    fn test_heading() {
+        let v = Vector::new([1., 1.].map(|x| FiniteF64::new(x).unwrap()));
+        assert!(v.heading_angle_2d().closes_to(PI / 4.));
+        let v = Vector::new([-1., 1.].map(|x| FiniteF64::new(x).unwrap()));
+        assert!(v.heading_angle_2d().closes_to(PI / 2. + PI / 4.));
+        let v = Vector::new([-1., -1.].map(|x| FiniteF64::new(x).unwrap()));
+        assert!(v.heading_angle_2d().closes_to(PI + PI / 4. - 2. * PI));
+        let v = Vector::new([1., -1.].map(|x| FiniteF64::new(x).unwrap()));
+        assert!(v.heading_angle_2d().closes_to(-PI / 4.));
+    }
+
+    #[test]
+    fn test_rotation() {
+        let mut v = Vector::new([1., 0.5].map(|x| FiniteF64::new(x).unwrap()));
+        v.rotate_2d(PI / 2.);
+        assert!(v.dims[0].get().closes_to(-0.5));
+        assert!(v.dims[1].get().closes_to(1.));
     }
 }

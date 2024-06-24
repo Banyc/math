@@ -7,13 +7,16 @@ pub struct Vector<const N: usize> {
     dims: [FiniteF64; N],
 }
 impl<const N: usize> Vector<N> {
+    #[must_use]
     pub fn new(dims: [FiniteF64; N]) -> Self {
         Self { dims }
     }
+    #[must_use]
     pub fn dims(&self) -> &[FiniteF64; N] {
         &self.dims
     }
 
+    #[must_use]
     pub fn add(&self, other: &Self) -> Self {
         let dims = self
             .pairwise(other)
@@ -23,6 +26,7 @@ impl<const N: usize> Vector<N> {
         let dims = dims.try_into().unwrap();
         Self { dims }
     }
+    #[must_use]
     pub fn sub(&self, other: &Self) -> Self {
         let dims = self
             .pairwise(other)
@@ -32,6 +36,7 @@ impl<const N: usize> Vector<N> {
         let dims = dims.try_into().unwrap();
         Self { dims }
     }
+    #[must_use]
     pub fn dot(&self, other: &Self) -> f64 {
         self.pairwise(other)
             .map(|(a, b)| a.get() * b.get())
@@ -52,6 +57,7 @@ impl<const N: usize> Vector<N> {
     pub fn div(&mut self, other: f64) {
         self.mul(1. / other);
     }
+    #[must_use]
     pub fn mag(&self) -> f64 {
         let sum = self.dims.iter().map(|x| x.get().powi(2)).sum::<f64>();
         sum.sqrt()
@@ -67,9 +73,11 @@ impl<const N: usize> Vector<N> {
         let mag = self.mag().clamp(min, max);
         self.set_mag(mag);
     }
+    #[must_use]
     pub fn dist(&self, other: &Self) -> f64 {
         self.sub(other).mag()
     }
+    #[must_use]
     pub fn lerp(&self, other: &Self, t: NormalizedF64) -> Self {
         let dims = self
             .pairwise(other)

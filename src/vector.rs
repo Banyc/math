@@ -103,6 +103,12 @@ impl<const N: usize> Vector<N> {
         self.dims[adjacent_axis] = FiniteF64::new(x_).unwrap();
         self.dims[opposite_axis] = FiniteF64::new(y_).unwrap();
     }
+    #[must_use]
+    pub fn angle_between(&self, other: &Self) -> f64 {
+        let dot = self.dot(other);
+        let mul_mag = self.mag() * other.mag();
+        f64::acos(dot / mul_mag)
+    }
 }
 impl Vector<2> {
     #[must_use]

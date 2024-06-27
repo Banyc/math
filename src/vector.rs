@@ -109,6 +109,15 @@ impl<const N: usize> Vector<N> {
         let mul_mag = self.mag() * other.mag();
         f64::acos(dot / mul_mag)
     }
+    #[must_use]
+    pub fn normal_point(&self, start: &Self, end: &Self) -> Self {
+        let a = self.sub(start);
+        let mut b = end.sub(start);
+        let angle = a.angle_between(&b);
+        let d = a.mag() * f64::cos(angle);
+        b.set_mag(d);
+        b
+    }
 }
 impl Vector<2> {
     #[must_use]

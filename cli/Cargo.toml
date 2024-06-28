@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-banyc_polars_util = { version = "0.1" }
+banyc_polars_util = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 math = { path = "../" }
-polars = { version = "0.40" }
+polars = { version = "0.41" }
 strict-num = "0.2"

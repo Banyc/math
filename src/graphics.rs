@@ -1,8 +1,20 @@
+use strict_num::NormalizedF64;
+
 use crate::prob::Probability;
 
 /// Ref: <https://en.wikipedia.org/wiki/Linear_interpolation>
+#[must_use]
 pub fn lerp(v: &std::ops::RangeInclusive<f64>, t: Probability) -> f64 {
     t.complementary().get() * v.start() + t.get() * v.end()
+}
+
+#[must_use]
+pub fn perlin_interpolation(t: Probability) -> Probability {
+    let a = 6. * t.get().powi(5);
+    let b = -15. * t.get().powi(4);
+    let c = 10. * t.get().powi(3);
+    let g = a + b + c;
+    NormalizedF64::new_clamped(g).into()
 }
 
 /// Generate n colors with equally spaced hues.

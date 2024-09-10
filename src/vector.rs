@@ -1,6 +1,6 @@
 use strict_num::{FiniteF64, NormalizedF64};
 
-use crate::{graphics::lerp, prob::Probability};
+use crate::graphics::lerp;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector<const N: usize> {
@@ -81,7 +81,7 @@ impl<const N: usize> Vector<N> {
     pub fn lerp(&self, other: &Self, t: NormalizedF64) -> Self {
         let dims = self
             .pairwise(other)
-            .map(|(a, b)| lerp(&(a.get()..=b.get()), Probability::new(t.get()).unwrap()))
+            .map(|(a, b)| lerp(&(a.get()..=b.get()), t.into()))
             .map(|x| FiniteF64::new(x).unwrap())
             .collect::<Vec<FiniteF64>>();
         let dims = dims.try_into().unwrap();

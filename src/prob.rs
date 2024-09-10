@@ -8,23 +8,24 @@ impl Probability {
     /// # Option
     ///
     /// Return [`None`] if `p` is not in `[0, 1]`
+    #[must_use]
     pub fn new(p: f64) -> Option<Self> {
         let p = NormalizedF64::new(p)?;
         Some(Self(p))
     }
-
+    #[must_use]
     pub fn certainty() -> Self {
         Self(NormalizedF64::new(1.0).unwrap())
     }
-
+    #[must_use]
     pub fn impossibility() -> Self {
         Self(NormalizedF64::new(0.0).unwrap())
     }
-
+    #[must_use]
     pub fn complementary(&self) -> Self {
         Self(NormalizedF64::new(1.0 - self.0.get()).unwrap())
     }
-
+    #[must_use]
     pub fn get(&self) -> f64 {
         self.0.get()
     }

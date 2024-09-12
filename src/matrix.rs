@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use num_traits::Float;
+use num_traits::{Float, Zero};
 use primitive::{float::FloatExt, seq::Seq};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,11 +27,11 @@ impl Size {
 }
 
 #[derive(Debug, Clone)]
-pub struct Matrix<T> {
+pub struct MatrixBuf<T> {
     size: Size,
     data: T,
 }
-impl<T> Container2D for Matrix<T>
+impl<T> Container2D for MatrixBuf<T>
 where
     T: Seq<f64>,
 {
@@ -44,7 +44,7 @@ where
         self.data.as_slice()[index]
     }
 }
-impl<T> Container2DMut for Matrix<T>
+impl<T> Container2DMut for MatrixBuf<T>
 where
     T: Seq<f64>,
 {
@@ -53,7 +53,7 @@ where
         self.data.as_slice_mut()[index] = value;
     }
 }
-impl<T> Matrix<T>
+impl<T> MatrixBuf<T>
 where
     T: Seq<f64>,
 {
@@ -63,11 +63,14 @@ where
         }
         Self { size, data }
     }
-    pub fn zero(size: Size) -> Matrix<Vec<f64>> {
-        let data = vec![0.; size.volume().get()];
-        Matrix::new(size, data)
+    pub fn into_buffer(self) -> T {
+        self.data
     }
-    pub fn identity(rows: NonZeroUsize) -> Matrix<Vec<f64>> {
+    pub fn zero(size: Size) -> MatrixBuf<Vec<f64>> {
+        let data = vec![0.; size.volume().get()];
+        MatrixBuf::new(size, data)
+    }
+    pub fn identity(rows: NonZeroUsize) -> MatrixBuf<Vec<f64>> {
         let size = Size { rows, cols: rows };
         let mut matrix = Self::zero(size);
         for row in 0..rows.get() {
@@ -124,13 +127,13 @@ where
             cols: self.size().rows,
         };
         let mut out = Self::new(size, data);
-        transpose(self, &mut out);
+        self.transpose_in(&mut out);
         out
     }
     pub fn determinant(&self) -> f64 {
         self.full_partial().determinant()
     }
-    pub fn inverse(&self) -> Matrix<Vec<f64>> {
+    pub fn inverse(&self) -> MatrixBuf<Vec<f64>> {
         self.full_partial().inverse()
     }
 
@@ -158,20 +161,20 @@ where
         true
     }
 
-    pub fn mul_matrix(&self, other: &Self) -> Matrix<Vec<f64>> {
-        self.full_partial().mul_matrix(other.full_partial())
+    pub fn mul_matrix(&self, other: &impl Container2D<Item = f64>) -> MatrixBuf<Vec<f64>> {
+        self.full_partial().mul_matrix(other)
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct PartialMatrix<'orig, T> {
-    orig_matrix: &'orig Matrix<T>,
+    orig_matrix: &'orig MatrixBuf<T>,
     start: Index,
     /// exclusive
     end: Index,
 }
 impl<'orig, T> PartialMatrix<'orig, T> {
-    pub fn new(matrix: &'orig Matrix<T>, start: Index, end: Index) -> Self
+    pub fn new(matrix: &'orig MatrixBuf<T>, start: Index, end: Index) -> Self
     where
         T: Seq<f64>,
     {
@@ -214,13 +217,13 @@ impl<T> PartialMatrix<'_, T>
 where
     T: Seq<f64>,
 {
-    pub fn transpose(&self) -> Matrix<Vec<f64>> {
+    pub fn transpose(&self) -> MatrixBuf<Vec<f64>> {
         let size = Size {
             rows: self.size().cols,
             cols: self.size().rows,
         };
-        let mut matrix = Matrix::<Vec<f64>>::zero(size);
-        transpose(self, &mut matrix);
+        let mut matrix = MatrixBuf::<Vec<f64>>::zero(size);
+        self.transpose_in(&mut matrix);
         matrix
     }
     pub fn determinant(&self) -> f64 {
@@ -235,12 +238,13 @@ where
                 - self.cell(Index { row: 0, col: 1 }) * self.cell(Index { row: 1, col: 0 });
         }
 
+        let mut matrix = MatrixBuf::<Vec<f64>>::zero(self.exclude_cross_size());
         let mut sum = 0.;
         let mut alt_sign = 1.;
         for col in 0..self.size().cols.get() {
             let index = Index { row: 0, col };
             let value = self.cell(index);
-            let matrix = self.exclude_cross(index);
+            self.exclude_cross_in(index, &mut matrix);
             let det = matrix.determinant();
             sum += value * det * alt_sign;
             alt_sign *= -1.;
@@ -249,62 +253,32 @@ where
         sum
     }
 
-    pub fn exclude_cross(&self, index: Index) -> Matrix<Vec<f64>> {
-        let _valid = self.cell(index);
-        let rows = self.size().rows.get() - 1;
-        let cols = self.size().cols.get() - 1;
-        let Some(rows) = NonZeroUsize::new(rows) else {
-            panic!("zero rows");
-        };
-        let Some(cols) = NonZeroUsize::new(cols) else {
-            panic!("zero cols");
-        };
-        let size = Size { rows, cols };
-        let mut matrix = Matrix::<Vec<f64>>::zero(size);
-        for row in 0..self.size().rows.get() {
-            for col in 0..self.size().cols.get() {
-                let value = self.cell(Index { row, col });
-                let row = match row.cmp(&index.row) {
-                    std::cmp::Ordering::Less => row,
-                    std::cmp::Ordering::Equal => continue,
-                    std::cmp::Ordering::Greater => row - 1,
-                };
-                let col = match col.cmp(&index.col) {
-                    std::cmp::Ordering::Less => col,
-                    std::cmp::Ordering::Equal => continue,
-                    std::cmp::Ordering::Greater => col - 1,
-                };
-                let index = Index { row, col };
-                matrix.set_cell(index, value);
-            }
-        }
-        matrix
-    }
-
-    pub fn inverse(&self) -> Matrix<Vec<f64>> {
+    pub fn inverse(&self) -> MatrixBuf<Vec<f64>> {
         let det = self.determinant();
         let mut matrix = self.adjugate();
         matrix.mul_scalar(1. / det);
         matrix
     }
 
-    pub fn adjugate(&self) -> Matrix<Vec<f64>> {
+    pub fn adjugate(&self) -> MatrixBuf<Vec<f64>> {
         self.matrix_of_cofactors().transpose()
     }
 
-    pub fn matrix_of_minors(&self) -> Matrix<Vec<f64>> {
-        let mut matrix_of_minors = Matrix::<Vec<f64>>::zero(self.size());
+    pub fn matrix_of_minors(&self) -> MatrixBuf<Vec<f64>> {
+        let mut matrix_of_minors = MatrixBuf::<Vec<f64>>::zero(self.size());
+        let mut exclude_cross = MatrixBuf::<Vec<f64>>::zero(self.exclude_cross_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
-                let det = self.exclude_cross(index).determinant();
+                self.exclude_cross_in(index, &mut exclude_cross);
+                let det = exclude_cross.determinant();
                 matrix_of_minors.set_cell(index, det);
             }
         }
         matrix_of_minors
     }
 
-    pub fn matrix_of_cofactors(&self) -> Matrix<Vec<f64>> {
+    pub fn matrix_of_cofactors(&self) -> MatrixBuf<Vec<f64>> {
         let mut matrix = self.matrix_of_minors();
         for row in 0..matrix.size().rows.get() {
             for col in 0..matrix.size().cols.get() {
@@ -318,7 +292,7 @@ where
         matrix
     }
 
-    pub fn mul_matrix(&self, other: Self) -> Matrix<Vec<f64>> {
+    pub fn mul_matrix(&self, other: &impl Container2D<Item = f64>) -> MatrixBuf<Vec<f64>> {
         if self.size().cols != other.size().rows {
             panic!("unmatched matrix shapes for mul");
         }
@@ -326,8 +300,8 @@ where
             rows: self.size().rows,
             cols: other.size().cols,
         };
-        let mut matrix = Matrix::<Vec<f64>>::zero(size);
-        mul_matrix(self, &other, &mut matrix);
+        let mut matrix = MatrixBuf::<Vec<f64>>::zero(size);
+        self.mul_matrix_in(other, &mut matrix);
         matrix
     }
 }
@@ -344,40 +318,95 @@ pub trait Container2D {
 pub trait Container2DMut: Container2D {
     fn set_cell(&mut self, index: Index, value: Self::Item);
 }
-fn mul_matrix<T: Float>(
-    this: &impl Container2D<Item = T>,
-    other: &impl Container2D<Item = T>,
-    out: &mut impl Container2DMut<Item = T>,
-) {
-    assert_eq!(out.size().rows, this.size().rows);
-    assert_eq!(out.size().cols, other.size().cols);
-    for row in 0..this.size().rows.get() {
-        for col in 0..other.size().cols.get() {
-            let index = Index { row, col };
-            let mut sum = T::zero();
+pub trait Matrix: Container2D
+where
+    Self::Item: Float,
+{
+    fn mul_matrix_size(&self, other: &impl Container2D<Item = Self::Item>) -> Size {
+        Size {
+            rows: self.size().rows,
+            cols: other.size().cols,
+        }
+    }
+    fn mul_matrix_in(
+        &self,
+        other: &impl Container2D<Item = Self::Item>,
+        out: &mut impl Container2DMut<Item = Self::Item>,
+    ) {
+        assert_eq!(out.size(), self.mul_matrix_size(other));
+        for row in 0..self.size().rows.get() {
+            for col in 0..other.size().cols.get() {
+                let index = Index { row, col };
+                let mut sum = Zero::zero();
 
-            for i in 0..this.size().cols.get() {
-                let a = Index { row, col: i };
-                let b = Index { row: i, col };
-                let a = this.cell(a);
-                let b = other.cell(b);
-                sum = sum + (a * b);
+                for i in 0..self.size().cols.get() {
+                    let a = Index { row, col: i };
+                    let b = Index { row: i, col };
+                    let a = self.cell(a);
+                    let b = other.cell(b);
+                    sum = sum + (a * b);
+                }
+
+                out.set_cell(index, sum);
             }
+        }
+    }
 
-            out.set_cell(index, sum);
+    fn transpose_size(&self) -> Size {
+        Size {
+            rows: self.size().cols,
+            cols: self.size().rows,
+        }
+    }
+    fn transpose_in(&self, out: &mut impl Container2DMut<Item = Self::Item>) {
+        assert_eq!(out.size(), self.transpose_size());
+        for row in 0..self.size().rows.get() {
+            for col in 0..self.size().cols.get() {
+                let value = self.cell(Index { row, col });
+                let index = Index { row: col, col: row };
+                out.set_cell(index, value);
+            }
+        }
+    }
+
+    fn exclude_cross_size(&self) -> Size {
+        let rows = self.size().rows.get() - 1;
+        let cols = self.size().cols.get() - 1;
+        let Some(rows) = NonZeroUsize::new(rows) else {
+            panic!("zero rows");
+        };
+        let Some(cols) = NonZeroUsize::new(cols) else {
+            panic!("zero cols");
+        };
+        Size { rows, cols }
+    }
+    fn exclude_cross_in(&self, index: Index, out: &mut impl Container2DMut<Item = Self::Item>) {
+        let _valid = self.cell(index);
+        assert_eq!(out.size(), self.exclude_cross_size());
+        for row in 0..self.size().rows.get() {
+            for col in 0..self.size().cols.get() {
+                let value = self.cell(Index { row, col });
+                let row = match row.cmp(&index.row) {
+                    std::cmp::Ordering::Less => row,
+                    std::cmp::Ordering::Equal => continue,
+                    std::cmp::Ordering::Greater => row - 1,
+                };
+                let col = match col.cmp(&index.col) {
+                    std::cmp::Ordering::Less => col,
+                    std::cmp::Ordering::Equal => continue,
+                    std::cmp::Ordering::Greater => col - 1,
+                };
+                let index = Index { row, col };
+                out.set_cell(index, value);
+            }
         }
     }
 }
-fn transpose<T: Float>(this: &impl Container2D<Item = T>, out: &mut impl Container2DMut<Item = T>) {
-    assert_eq!(out.size().rows, this.size().cols);
-    assert_eq!(out.size().cols, this.size().rows);
-    for row in 0..this.size().rows.get() {
-        for col in 0..this.size().cols.get() {
-            let value = this.cell(Index { row, col });
-            let index = Index { row: col, col: row };
-            out.set_cell(index, value);
-        }
-    }
+impl<T, F> Matrix for T
+where
+    T: Container2D<Item = F>,
+    F: Float,
+{
 }
 
 #[cfg(test)]
@@ -391,7 +420,7 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = Matrix::new(size, data);
+        let matrix = MatrixBuf::new(size, data);
         assert_eq!(matrix.cell(Index { row: 0, col: 0 }), 0.);
         assert_eq!(matrix.cell(Index { row: 0, col: 1 }), 1.);
         assert_eq!(matrix.cell(Index { row: 0, col: 2 }), 2.);
@@ -407,9 +436,9 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let mut matrix = Matrix::new(size, data);
+        let mut matrix = MatrixBuf::new(size, data);
         matrix.add_scalar(1.);
-        let expected = Matrix::new(size, vec![1., 2., 3., 4., 5., 6.]);
+        let expected = MatrixBuf::new(size, vec![1., 2., 3., 4., 5., 6.]);
         assert!(matrix.closes_to(&expected));
     }
 
@@ -420,9 +449,9 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let mut matrix = Matrix::new(size, data);
+        let mut matrix = MatrixBuf::new(size, data);
         matrix.mul_scalar(2.);
-        let expected = Matrix::new(size, vec![0., 2., 4., 6., 8., 10.]);
+        let expected = MatrixBuf::new(size, vec![0., 2., 4., 6., 8., 10.]);
         assert!(matrix.closes_to(&expected));
     }
 
@@ -433,13 +462,13 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = Matrix::new(size, data);
+        let matrix = MatrixBuf::new(size, data);
         let matrix = matrix.transpose();
         let size = Size {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let expected = Matrix::new(
+        let expected = MatrixBuf::new(
             size,
             vec![
                 0., 3., 1., //
@@ -456,7 +485,7 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let matrix = Matrix::new(size, data);
+        let matrix = MatrixBuf::new(size, data);
         assert_eq!(matrix.determinant(), -14.);
 
         let data = vec![
@@ -468,7 +497,7 @@ mod tests {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = Matrix::new(size, data);
+        let matrix = MatrixBuf::new(size, data);
         assert_eq!(matrix.determinant(), -306.);
     }
 
@@ -483,9 +512,9 @@ mod tests {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = Matrix::new(size, data);
+        let matrix = MatrixBuf::new(size, data);
         let inverse = matrix.inverse();
-        let expected = Matrix::new(
+        let expected = MatrixBuf::new(
             size,
             vec![
                 0.2, 0.2, 0., //
@@ -503,9 +532,9 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let matrix = Matrix::new(size, data);
+        let matrix = MatrixBuf::new(size, data);
         let inverse = matrix.inverse();
-        let expected = Matrix::new(
+        let expected = MatrixBuf::new(
             size,
             vec![
                 1.0, -1.0, //
@@ -525,7 +554,7 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let a = Matrix::new(size, data);
+        let a = MatrixBuf::new(size, data);
 
         let data = vec![
             7., 8., //
@@ -536,14 +565,14 @@ mod tests {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let b = Matrix::new(size, data);
+        let b = MatrixBuf::new(size, data);
 
         let matrix = a.mul_matrix(&b);
         let size = Size {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let expected = Matrix::new(
+        let expected = MatrixBuf::new(
             size,
             vec![
                 58., 64., //

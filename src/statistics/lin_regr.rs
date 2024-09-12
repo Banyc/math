@@ -5,7 +5,7 @@ use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
 
 use crate::{
-    matrix::{Container2D, Index, Matrix, Size},
+    matrix::{Container2D, Index, MatrixBuf, Size},
     statistics::variance::VarianceExt,
     transformer::Estimate,
 };
@@ -58,7 +58,7 @@ where
             rows: XTy_rows,
             cols: NonZeroUsize::new(1).unwrap(),
         };
-        let XTy = Matrix::new(size, XTy_data);
+        let XTy = MatrixBuf::new(size, XTy_data);
 
         let b = XTX_inv.mul_matrix(&XTy);
 
@@ -98,7 +98,9 @@ pub enum ExamplesError {
 }
 
 #[allow(non_snake_case)]
-fn XTX_inv<V>(examples: impl Iterator<Item = V> + Clone) -> Result<Matrix<Vec<f64>>, ExamplesError>
+fn XTX_inv<V>(
+    examples: impl Iterator<Item = V> + Clone,
+) -> Result<MatrixBuf<Vec<f64>>, ExamplesError>
 where
     V: Sample,
 {
@@ -155,7 +157,7 @@ where
         rows: XTX_rows,
         cols: XTX_rows,
     };
-    let XTX = Matrix::new(size, XTX_data);
+    let XTX = MatrixBuf::new(size, XTX_data);
     Ok(XTX.inverse())
 }
 

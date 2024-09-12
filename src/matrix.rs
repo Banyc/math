@@ -24,6 +24,9 @@ impl Size {
         let volume = self.rows.get() * self.cols.get();
         NonZeroUsize::new(volume).unwrap()
     }
+    pub fn is_square(&self) -> bool {
+        self.rows == self.cols
+    }
 }
 
 pub type ArrayMatrixBuf<F, const N: usize> = MatrixBuf<[F; N], F>;
@@ -195,71 +198,13 @@ where
         self.transpose_in(&mut matrix);
         matrix
     }
-    pub fn determinant(&self) -> F {
-        if !self.is_square() {
-            panic!("not a square matrix");
-        }
-        if self.size().rows.get() == 1 {
-            return self.cell(Index { row: 0, col: 0 });
-        }
-        if self.size().rows.get() == 2 {
-            return self.cell(Index { row: 0, col: 0 }) * self.cell(Index { row: 1, col: 1 })
-                - self.cell(Index { row: 0, col: 1 }) * self.cell(Index { row: 1, col: 0 });
-        }
-
-        let mut matrix = VecMatrixBuf::<F>::zero(self.exclude_cross_size());
-        let mut sum = Zero::zero();
-        let mut alt_sign = One::one();
-        for col in 0..self.size().cols.get() {
-            let index = Index { row: 0, col };
-            let value = self.cell(index);
-            self.exclude_cross_in(index, &mut matrix);
-            let det = matrix.determinant();
-            sum = sum + (value * det * alt_sign);
-            alt_sign = alt_sign.neg();
-        }
-
-        sum
-    }
 
     pub fn inverse(&self) -> VecMatrixBuf<F> {
-        let det = self.determinant();
-        let mut matrix = self.adjugate();
-        matrix.cell_wise_mut_scalar(|x| x / det);
-        matrix
-    }
-
-    pub fn adjugate(&self) -> VecMatrixBuf<F> {
-        self.matrix_of_cofactors().transpose()
-    }
-
-    pub fn matrix_of_minors(&self) -> VecMatrixBuf<F> {
-        let mut matrix_of_minors = VecMatrixBuf::<F>::zero(self.size());
         let mut exclude_cross = VecMatrixBuf::<F>::zero(self.exclude_cross_size());
-        for row in 0..self.size().rows.get() {
-            for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
-                self.exclude_cross_in(index, &mut exclude_cross);
-                let det = exclude_cross.determinant();
-                matrix_of_minors.set_cell(index, det);
-            }
-        }
-        matrix_of_minors
-    }
-
-    pub fn matrix_of_cofactors(&self) -> VecMatrixBuf<F> {
-        let mut matrix = self.matrix_of_minors();
-        for row in 0..matrix.size().rows.get() {
-            for col in 0..matrix.size().cols.get() {
-                let is_even = (row + col) % 2 == 0;
-                let sign = if is_even { 1. } else { -1. };
-                let sign = F::from(sign).unwrap();
-                let index = Index { row, col };
-                let value = matrix.cell(index);
-                matrix.set_cell(index, value * sign);
-            }
-        }
-        matrix
+        let mut matrix_of_cofactors = VecMatrixBuf::<F>::zero(self.matrix_of_cofactors_size());
+        let mut out = VecMatrixBuf::<F>::zero(self.inverse_size());
+        self.inverse_in(&mut exclude_cross, &mut matrix_of_cofactors, &mut out);
+        out
     }
 
     pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
@@ -287,10 +232,6 @@ pub trait Matrix<T>: Container2D<T>
 where
     T: Float,
 {
-    fn is_square(&self) -> bool {
-        self.size().rows == self.size().cols
-    }
-
     fn cell_wise_mut_scalar(&mut self, op: impl Fn(T) -> T)
     where
         Self: Container2DMut<T>,
@@ -408,6 +349,100 @@ where
                 out.set_cell(index, value);
             }
         }
+    }
+
+    fn determinant(&self) -> T {
+        if !self.size().is_square() {
+            panic!("not a square matrix");
+        }
+        if self.size().rows.get() == 1 {
+            return self.cell(Index { row: 0, col: 0 });
+        }
+        if self.size().rows.get() == 2 {
+            return self.cell(Index { row: 0, col: 0 }) * self.cell(Index { row: 1, col: 1 })
+                - self.cell(Index { row: 0, col: 1 }) * self.cell(Index { row: 1, col: 0 });
+        }
+
+        let mut matrix = VecMatrixBuf::<T>::zero(self.exclude_cross_size());
+        let mut sum = Zero::zero();
+        let mut alt_sign = One::one();
+        for col in 0..self.size().cols.get() {
+            let index = Index { row: 0, col };
+            let value = self.cell(index);
+            self.exclude_cross_in(index, &mut matrix);
+            let det = matrix.determinant();
+            sum = sum + (value * det * alt_sign);
+            alt_sign = alt_sign.neg();
+        }
+
+        sum
+    }
+
+    fn matrix_of_minors_size(&self) -> Size {
+        self.size()
+    }
+    fn matrix_of_minors_in(
+        &self,
+        exclude_cross: &mut impl Container2DMut<T>,
+        out: &mut impl Container2DMut<T>,
+    ) {
+        assert_eq!(out.size(), self.matrix_of_minors_size());
+        for row in 0..self.size().rows.get() {
+            for col in 0..self.size().cols.get() {
+                let index = Index { row, col };
+                self.exclude_cross_in(index, exclude_cross);
+                let det = exclude_cross.determinant();
+                out.set_cell(index, det);
+            }
+        }
+    }
+
+    fn matrix_of_cofactors_size(&self) -> Size {
+        self.matrix_of_minors_size()
+    }
+    fn matrix_of_cofactors_in(
+        &self,
+        exclude_cross: &mut impl Container2DMut<T>,
+        out: &mut impl Container2DMut<T>,
+    ) {
+        self.matrix_of_minors_in(exclude_cross, out);
+        for row in 0..out.size().rows.get() {
+            for col in 0..out.size().cols.get() {
+                let is_even = (row + col) % 2 == 0;
+                let sign = if is_even { 1. } else { -1. };
+                let sign = T::from(sign).unwrap();
+                let index = Index { row, col };
+                let value = out.cell(index);
+                out.set_cell(index, value * sign);
+            }
+        }
+    }
+
+    fn adjugate_size(&self) -> Size {
+        self.transpose_size()
+    }
+    fn adjugate_in(
+        &self,
+        exclude_cross: &mut impl Container2DMut<T>,
+        matrix_of_cofactors: &mut impl Container2DMut<T>,
+        out: &mut impl Container2DMut<T>,
+    ) {
+        self.matrix_of_cofactors_in(exclude_cross, matrix_of_cofactors);
+        matrix_of_cofactors.transpose_in(out);
+    }
+
+    fn inverse_size(&self) -> Size {
+        self.adjugate_size()
+    }
+    fn inverse_in(
+        &self,
+        exclude_cross: &mut impl Container2DMut<T>,
+        matrix_of_cofactors: &mut impl Container2DMut<T>,
+        out: &mut impl Container2DMut<T>,
+    ) {
+        let det = self.determinant();
+        self.adjugate_in(exclude_cross, matrix_of_cofactors, out);
+        out.cell_wise_mut_scalar(|x| x / det);
     }
 }
 impl<T, F> Matrix<F> for T

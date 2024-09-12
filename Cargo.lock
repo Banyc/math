@@ -1376,7 +1376,7 @@ dependencies = [
 [[package]]
 name = "primitive"
 version = "0.1.0"
-source = "git+https://github.com/Banyc/primitive.git?tag=v0.0.6#9e990fa86bda89d7a6aa5c4e80e8ff52f0f23b48"
+source = "git+https://github.com/Banyc/primitive.git?tag=v0.0.7#d0180812bcabdbce218d2a0da8e850cae20774bc"
 dependencies = [
  "anyhow",
  "num-traits",

@@ -18,5 +18,5 @@ strict-num = { workspace = true, features = ["serde"] }
 thiserror = "1"
 
 [workspace.dependencies]
-primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.6" }
+primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.7" }
 strict-num = "0.2"

@@ -1,7 +1,10 @@
 use std::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::{Float, One, Zero};
-use primitive::{float::FloatExt, seq::Seq};
+use primitive::{
+    float::FloatExt,
+    seq::{Seq, SeqMut},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Index {
@@ -52,7 +55,7 @@ where
 }
 impl<T, F> Container2DMut<F> for MatrixBuf<T, F>
 where
-    T: Seq<F>,
+    T: SeqMut<F>,
     F: Float,
 {
     fn set_cell(&mut self, index: Index, value: F) {
@@ -92,19 +95,9 @@ where
         matrix
     }
 
-    fn index_2_to_1(&self, index: Index) -> usize {
-        if self.size().cols.get() <= index.col {
-            panic!("col out of range");
-        }
-        if self.size().rows.get() <= index.row {
-            panic!("row out of range");
-        }
-        index.to_1(self.size().cols)
-    }
-
     pub fn transpose(&self) -> Self
     where
-        T: Clone,
+        T: Clone + SeqMut<F>,
     {
         let data = self.data.clone();
         let size = Size {
@@ -121,6 +114,9 @@ where
     pub fn inverse(&self) -> VecMatrixBuf<F> {
         self.full_partial().inverse()
     }
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
+        self.full_partial().mul_matrix(other)
+    }
 
     fn full_partial(&self) -> PartialMatrix<'_, T, F> {
         let start = Index { row: 0, col: 0 };
@@ -130,9 +126,14 @@ where
         };
         PartialMatrix::new(self, start, end)
     }
-
-    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
-        self.full_partial().mul_matrix(other)
+    fn index_2_to_1(&self, index: Index) -> usize {
+        if self.size().cols.get() <= index.col {
+            panic!("col out of range");
+        }
+        if self.size().rows.get() <= index.row {
+            panic!("row out of range");
+        }
+        index.to_1(self.size().cols)
     }
 }
 
@@ -219,6 +220,12 @@ where
         self.mul_matrix_in(other, &mut matrix);
         matrix
     }
+
+    pub fn collect(&self) -> VecMatrixBuf<F> {
+        let mut out = VecMatrixBuf::zero(self.size());
+        out.zip_mut(self, |_, x| x);
+        out
+    }
 }
 
 pub trait Container2D<T> {
@@ -232,7 +239,7 @@ pub trait Matrix<T>: Container2D<T>
 where
     T: Float,
 {
-    fn cell_wise_mut_scalar(&mut self, op: impl Fn(T) -> T)
+    fn for_each(&mut self, op: impl Fn(T) -> T)
     where
         Self: Container2DMut<T>,
     {
@@ -245,7 +252,7 @@ where
             }
         }
     }
-    fn cell_wise_mut_matrix(&mut self, other: &impl Container2D<T>, op: impl Fn(T, T) -> T)
+    fn zip_mut(&mut self, other: &impl Container2D<T>, op: impl Fn(T, T) -> T)
     where
         Self: Container2DMut<T>,
     {
@@ -442,7 +449,7 @@ where
     ) {
         let det = self.determinant();
         self.adjugate_in(exclude_cross, matrix_of_cofactors, out);
-        out.cell_wise_mut_scalar(|x| x / det);
+        out.for_each(|x| x / det);
     }
 }
 impl<T, F> Matrix<F> for T
@@ -480,7 +487,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.cell_wise_mut_scalar(|x| x + 1.);
+        matrix.for_each(|x| x + 1.);
         let expected = MatrixBuf::new(size, vec![1., 2., 3., 4., 5., 6.]);
         assert!(matrix.closes_to(&expected));
     }
@@ -493,7 +500,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.cell_wise_mut_scalar(|x| x * 2.);
+        matrix.for_each(|x| x * 2.);
         let expected = MatrixBuf::new(size, vec![0., 2., 4., 6., 8., 10.]);
         assert!(matrix.closes_to(&expected));
     }

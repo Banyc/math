@@ -63,13 +63,31 @@ where
         self.data.as_slice_mut()[index] = value;
     }
 }
+impl<T, F> Seq<F> for MatrixBuf<T, F>
+where
+    T: SeqMut<F>,
+    F: Float,
+{
+    fn as_slice(&self) -> &[F] {
+        self.data.as_slice()
+    }
+}
+impl<T, F> SeqMut<F> for MatrixBuf<T, F>
+where
+    T: SeqMut<F>,
+    F: Float,
+{
+    fn as_slice_mut(&mut self) -> &mut [F] {
+        self.data.as_slice_mut()
+    }
+}
 impl<T, F> MatrixBuf<T, F>
 where
     T: Seq<F>,
     F: Float,
 {
     pub fn new(size: Size, data: T) -> Self {
-        if size.volume().get() < data.as_slice().len() {
+        if data.as_slice().len() < size.volume().get() {
             panic!("not enough buffer size");
         }
         Self {
@@ -201,10 +219,9 @@ where
     }
 
     pub fn inverse(&self) -> VecMatrixBuf<F> {
-        let mut exclude_cross = VecMatrixBuf::<F>::zero(self.exclude_cross_size());
         let mut matrix_of_cofactors = VecMatrixBuf::<F>::zero(self.matrix_of_cofactors_size());
         let mut out = VecMatrixBuf::<F>::zero(self.inverse_size());
-        self.inverse_in(&mut exclude_cross, &mut matrix_of_cofactors, &mut out);
+        self.inverse_in(&mut matrix_of_cofactors, &mut out);
         out
     }
 
@@ -428,27 +445,24 @@ where
     fn adjugate_size(&self) -> Size {
         self.transpose_size()
     }
-    fn adjugate_in(
-        &self,
-        exclude_cross: &mut impl Container2DMut<T>,
-        matrix_of_cofactors: &mut impl Container2DMut<T>,
-        out: &mut impl Container2DMut<T>,
-    ) {
-        self.matrix_of_cofactors_in(exclude_cross, matrix_of_cofactors);
+    fn adjugate_in<O>(&self, matrix_of_cofactors: &mut impl Container2DMut<T>, out: &mut O)
+    where
+        O: Container2DMut<T> + SeqMut<T>,
+    {
+        let mut exclude_cross = MatrixBuf::new(self.exclude_cross_size(), out.as_slice_mut());
+        self.matrix_of_cofactors_in(&mut exclude_cross, matrix_of_cofactors);
         matrix_of_cofactors.transpose_in(out);
     }
 
     fn inverse_size(&self) -> Size {
         self.adjugate_size()
     }
-    fn inverse_in(
-        &self,
-        exclude_cross: &mut impl Container2DMut<T>,
-        matrix_of_cofactors: &mut impl Container2DMut<T>,
-        out: &mut impl Container2DMut<T>,
-    ) {
+    fn inverse_in<O>(&self, matrix_of_cofactors: &mut impl Container2DMut<T>, out: &mut O)
+    where
+        O: Container2DMut<T> + SeqMut<T>,
+    {
         let det = self.determinant();
-        self.adjugate_in(exclude_cross, matrix_of_cofactors, out);
+        self.adjugate_in(matrix_of_cofactors, out);
         out.for_each(|x| x / det);
     }
 }

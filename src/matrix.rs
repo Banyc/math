@@ -1,6 +1,7 @@
 use std::num::NonZeroUsize;
 
-use crate::float::FloatExt;
+use num_traits::Float;
+use primitive::{float::FloatExt, seq::Seq};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Index {
@@ -14,56 +15,60 @@ impl Index {
 }
 
 #[derive(Debug, Clone)]
-pub struct Matrix {
+pub struct Matrix<T> {
     rows: NonZeroUsize,
-    data: Vec<f64>,
+    data: T,
 }
-impl Matrix {
-    pub fn new(rows: NonZeroUsize, data: Vec<f64>) -> Self {
-        if data.len() % rows.get() != 0 {
+impl<T> Container2D for Matrix<T>
+where
+    T: Seq<f64>,
+{
+    type Item = f64;
+    fn rows(&self) -> NonZeroUsize {
+        self.rows
+    }
+    fn cols(&self) -> NonZeroUsize {
+        let cols = self.data.as_slice().len() / self.rows.get();
+        NonZeroUsize::new(cols).unwrap()
+    }
+    fn cell(&self, index: Index) -> Self::Item {
+        let index = self.index_2_to_1(index);
+        self.data.as_slice()[index]
+    }
+}
+impl<T> Container2DMut for Matrix<T>
+where
+    T: Seq<f64>,
+{
+    fn set_cell(&mut self, index: Index, value: Self::Item) {
+        let index = self.index_2_to_1(index);
+        self.data.as_slice_mut()[index] = value;
+    }
+}
+impl<T> Matrix<T>
+where
+    T: Seq<f64>,
+{
+    pub fn new(rows: NonZeroUsize, data: T) -> Self {
+        if data.as_slice().len() % rows.get() != 0 {
             panic!("not even");
         }
-        if data.is_empty() {
+        if data.as_slice().is_empty() {
             panic!("no data");
         }
         Self { rows, data }
     }
-
-    pub fn zero(rows: NonZeroUsize, cols: NonZeroUsize) -> Self {
+    pub fn zero(rows: NonZeroUsize, cols: NonZeroUsize) -> Matrix<Vec<f64>> {
         let data = vec![0.; rows.get() * cols.get()];
-        Self::new(rows, data)
+        Matrix::new(rows, data)
     }
-
-    pub fn identity(rows: NonZeroUsize) -> Self {
+    pub fn identity(rows: NonZeroUsize) -> Matrix<Vec<f64>> {
         let mut matrix = Self::zero(rows, rows);
         for row in 0..rows.get() {
             let index = Index { row, col: row };
             matrix.set_cell(index, 1.);
         }
         matrix
-    }
-
-    pub fn rows(&self) -> NonZeroUsize {
-        self.rows
-    }
-
-    pub fn cols(&self) -> NonZeroUsize {
-        let cols = self.data.len() / self.rows.get();
-        NonZeroUsize::new(cols).unwrap()
-    }
-
-    pub fn is_square(&self) -> bool {
-        self.full_partial().is_square()
-    }
-
-    pub fn cell(&self, index: Index) -> f64 {
-        let index = self.index_2_to_1(index);
-        self.data[index]
-    }
-
-    pub fn set_cell(&mut self, index: Index, value: f64) {
-        let index = self.index_2_to_1(index);
-        self.data[index] = value;
     }
 
     fn index_2_to_1(&self, index: Index) -> usize {
@@ -77,47 +82,52 @@ impl Matrix {
     }
 
     pub fn add_scalar(&mut self, value: f64) {
-        for cell in &mut self.data {
+        for cell in self.data.as_slice_mut() {
             *cell += value;
         }
     }
-
     pub fn mul_scalar(&mut self, value: f64) {
-        for cell in &mut self.data {
+        for cell in self.data.as_slice_mut() {
             *cell *= value;
         }
     }
 
-    pub fn add_matrix(&mut self, other: &Matrix) {
+    pub fn add_matrix(&mut self, other: &impl Container2D<Item = f64>) {
         self.assert_same_shape(other);
-        self.data
-            .iter_mut()
-            .zip(other.data.iter().copied())
-            .for_each(|(this, other)| *this += other);
+        for row in 0..self.rows().get() {
+            for col in 0..self.cols().get() {
+                let index = Index { row, col };
+                let value = other.cell(index);
+                self.set_cell(index, value);
+            }
+        }
     }
-
-    pub fn assert_same_shape(&self, other: &Matrix) {
-        if self.rows != other.rows {
+    pub fn assert_same_shape(&self, other: &impl Container2D<Item = f64>) {
+        if self.rows() != other.rows() {
             panic!("unmatched rows");
         }
-        if self.data.len() != other.data.len() {
+        if self.cols() != other.cols() {
             panic!("unmatched cols");
         }
     }
 
-    pub fn transpose(&self) -> Self {
-        self.full_partial().transpose()
+    pub fn transpose(&self) -> Self
+    where
+        T: Clone,
+    {
+        let data = self.data.clone();
+        let mut out = Self::new(self.cols(), data);
+        transpose(self, &mut out);
+        out
     }
-
     pub fn determinant(&self) -> f64 {
         self.full_partial().determinant()
     }
-
-    pub fn inverse(&self) -> Self {
+    pub fn inverse(&self) -> Matrix<Vec<f64>> {
         self.full_partial().inverse()
     }
 
-    fn full_partial(&self) -> PartialMatrix<'_> {
+    fn full_partial(&self) -> PartialMatrix<'_, T> {
         let start = Index { row: 0, col: 0 };
         let end = Index {
             row: self.rows().get(),
@@ -126,30 +136,38 @@ impl Matrix {
         PartialMatrix::new(self, start, end)
     }
 
-    pub fn closes_to(&self, other: &Self) -> bool {
+    pub fn closes_to(&self, other: &impl Container2D<Item = f64>) -> bool {
         self.assert_same_shape(other);
-        for (a, b) in self.data.iter().copied().zip(other.data.iter().copied()) {
-            if !a.closes_to(b) {
-                return false;
+        for row in 0..self.rows().get() {
+            for col in 0..self.cols().get() {
+                let index = Index { row, col };
+                let other = other.cell(index);
+                let this = self.cell(index);
+                if !this.closes_to(other) {
+                    return false;
+                }
             }
         }
         true
     }
 
-    pub fn mul_matrix(&self, other: &Self) -> Matrix {
+    pub fn mul_matrix(&self, other: &Self) -> Matrix<Vec<f64>> {
         self.full_partial().mul_matrix(other.full_partial())
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct PartialMatrix<'orig> {
-    orig_matrix: &'orig Matrix,
+pub struct PartialMatrix<'orig, T> {
+    orig_matrix: &'orig Matrix<T>,
     start: Index,
     /// exclusive
     end: Index,
 }
-impl<'orig> PartialMatrix<'orig> {
-    pub fn new(matrix: &'orig Matrix, start: Index, end: Index) -> Self {
+impl<'orig, T> PartialMatrix<'orig, T> {
+    pub fn new(matrix: &'orig Matrix<T>, start: Index, end: Index) -> Self
+    where
+        T: Seq<f64>,
+    {
         let start_in_bound = start.row < matrix.rows().get() && start.col < matrix.cols().get();
         let end_in_bound = end.row <= matrix.rows().get() && end.col <= matrix.cols().get();
         let start_end_in_order = start.row < end.row && start.col < end.col;
@@ -164,40 +182,35 @@ impl<'orig> PartialMatrix<'orig> {
         }
     }
 }
-impl PartialMatrix<'_> {
-    pub fn rows(&self) -> NonZeroUsize {
+impl<T> Container2D for PartialMatrix<'_, T>
+where
+    T: Seq<f64>,
+{
+    type Item = f64;
+    fn rows(&self) -> NonZeroUsize {
         let rows = self.end.row - self.start.row;
         NonZeroUsize::new(rows).unwrap()
     }
-
-    pub fn cols(&self) -> NonZeroUsize {
+    fn cols(&self) -> NonZeroUsize {
         let cols = self.end.col - self.start.col;
         NonZeroUsize::new(cols).unwrap()
     }
-
-    pub fn cell(&self, index: Index) -> f64 {
+    fn cell(&self, index: Index) -> Self::Item {
         let row = index.row + self.start.row;
         let col = index.col + self.start.col;
         let index = Index { row, col };
         self.orig_matrix.cell(index)
     }
-
-    pub fn is_square(&self) -> bool {
-        self.rows() == self.cols()
-    }
-
-    pub fn transpose(&self) -> Matrix {
-        let mut matrix = Matrix::zero(self.cols(), self.rows());
-        for row in 0..self.rows().get() {
-            for col in 0..self.cols().get() {
-                let value = self.cell(Index { row, col });
-                let index = Index { row: col, col: row };
-                matrix.set_cell(index, value);
-            }
-        }
+}
+impl<T> PartialMatrix<'_, T>
+where
+    T: Seq<f64>,
+{
+    pub fn transpose(&self) -> Matrix<Vec<f64>> {
+        let mut matrix = Matrix::<Vec<f64>>::zero(self.cols(), self.rows());
+        transpose(self, &mut matrix);
         matrix
     }
-
     pub fn determinant(&self) -> f64 {
         if !self.is_square() {
             panic!("not a square matrix");
@@ -224,7 +237,7 @@ impl PartialMatrix<'_> {
         sum
     }
 
-    pub fn exclude_cross(&self, index: Index) -> Matrix {
+    pub fn exclude_cross(&self, index: Index) -> Matrix<Vec<f64>> {
         let _valid = self.cell(index);
         let rows = self.rows().get() - 1;
         let cols = self.cols().get() - 1;
@@ -234,7 +247,7 @@ impl PartialMatrix<'_> {
         let Some(cols) = NonZeroUsize::new(cols) else {
             panic!("zero cols");
         };
-        let mut matrix = Matrix::zero(rows, cols);
+        let mut matrix = Matrix::<Vec<f64>>::zero(rows, cols);
         for row in 0..self.rows().get() {
             for col in 0..self.cols().get() {
                 let value = self.cell(Index { row, col });
@@ -255,19 +268,19 @@ impl PartialMatrix<'_> {
         matrix
     }
 
-    pub fn inverse(&self) -> Matrix {
+    pub fn inverse(&self) -> Matrix<Vec<f64>> {
         let det = self.determinant();
         let mut matrix = self.adjugate();
         matrix.mul_scalar(1. / det);
         matrix
     }
 
-    pub fn adjugate(&self) -> Matrix {
+    pub fn adjugate(&self) -> Matrix<Vec<f64>> {
         self.matrix_of_cofactors().transpose()
     }
 
-    pub fn matrix_of_minors(&self) -> Matrix {
-        let mut matrix_of_minors = Matrix::zero(self.rows(), self.cols());
+    pub fn matrix_of_minors(&self) -> Matrix<Vec<f64>> {
+        let mut matrix_of_minors = Matrix::<Vec<f64>>::zero(self.rows(), self.cols());
         for row in 0..self.rows().get() {
             for col in 0..self.cols().get() {
                 let index = Index { row, col };
@@ -278,7 +291,7 @@ impl PartialMatrix<'_> {
         matrix_of_minors
     }
 
-    pub fn matrix_of_cofactors(&self) -> Matrix {
+    pub fn matrix_of_cofactors(&self) -> Matrix<Vec<f64>> {
         let mut matrix = self.matrix_of_minors();
         for row in 0..matrix.rows().get() {
             for col in 0..matrix.cols().get() {
@@ -292,30 +305,62 @@ impl PartialMatrix<'_> {
         matrix
     }
 
-    pub fn mul_matrix(&self, other: Self) -> Matrix {
+    pub fn mul_matrix(&self, other: Self) -> Matrix<Vec<f64>> {
         if self.cols() != other.rows() {
             panic!("unmatched matrix shapes for mul");
         }
-        let mut matrix = Matrix::zero(self.rows(), other.cols());
-
-        for row in 0..self.rows().get() {
-            for col in 0..other.cols().get() {
-                let index = Index { row, col };
-                let mut sum = 0.;
-
-                for i in 0..self.cols().get() {
-                    let a = Index { row, col: i };
-                    let b = Index { row: i, col };
-                    let a = self.cell(a);
-                    let b = other.cell(b);
-                    sum += a * b;
-                }
-
-                matrix.set_cell(index, sum);
-            }
-        }
-
+        let mut matrix = Matrix::<Vec<f64>>::zero(self.rows(), other.cols());
+        mul_matrix(self, &other, &mut matrix);
         matrix
+    }
+}
+
+pub trait Container2D {
+    type Item;
+    fn rows(&self) -> NonZeroUsize;
+    fn cols(&self) -> NonZeroUsize;
+    fn cell(&self, index: Index) -> Self::Item;
+
+    fn is_square(&self) -> bool {
+        self.rows() == self.cols()
+    }
+}
+pub trait Container2DMut: Container2D {
+    fn set_cell(&mut self, index: Index, value: Self::Item);
+}
+fn mul_matrix<T: Float>(
+    this: &impl Container2D<Item = T>,
+    other: &impl Container2D<Item = T>,
+    out: &mut impl Container2DMut<Item = T>,
+) {
+    assert_eq!(out.rows(), this.rows());
+    assert_eq!(out.cols(), other.cols());
+    for row in 0..this.rows().get() {
+        for col in 0..other.cols().get() {
+            let index = Index { row, col };
+            let mut sum = T::zero();
+
+            for i in 0..this.cols().get() {
+                let a = Index { row, col: i };
+                let b = Index { row: i, col };
+                let a = this.cell(a);
+                let b = other.cell(b);
+                sum = sum + (a * b);
+            }
+
+            out.set_cell(index, sum);
+        }
+    }
+}
+fn transpose<T: Float>(this: &impl Container2D<Item = T>, out: &mut impl Container2DMut<Item = T>) {
+    assert_eq!(out.rows(), this.cols());
+    assert_eq!(out.cols(), this.rows());
+    for row in 0..this.rows().get() {
+        for col in 0..this.cols().get() {
+            let value = this.cell(Index { row, col });
+            let index = Index { row: col, col: row };
+            out.set_cell(index, value);
+        }
     }
 }
 

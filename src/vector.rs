@@ -155,7 +155,7 @@ impl Vector<3> {
 mod tests {
     use std::f64::consts::PI;
 
-    use crate::float::FloatExt;
+    use primitive::float::FloatExt;
 
     use super::*;
 

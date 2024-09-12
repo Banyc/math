@@ -3,12 +3,11 @@ use std::path::PathBuf;
 use banyc_polars_util::read_df_file;
 use clap::Args;
 use math::{
-    iter::AssertIteratorItemExt,
     statistics::lin_regr::{adjusted_r_squared, t_test_params, LinearRegressionEstimator, Sample},
     transformer::Estimate,
-    two_dim::VecZip,
 };
 use polars::prelude::*;
+use primitive::iter::{AssertIteratorItemExt, VecZip};
 use strict_num::FiniteF64;
 
 #[derive(Debug, Clone, Args)]

@@ -1,6 +1,6 @@
+use primitive::float::FloatExt;
 use thiserror::Error;
 
-use crate::float::FloatExt;
 use std::{fmt::Display, ops};
 
 #[derive(Debug, Error, Clone, Copy)]
@@ -230,8 +230,6 @@ impl Display for Polynomial {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::FloatExt;
-
     use super::*;
 
     #[test]

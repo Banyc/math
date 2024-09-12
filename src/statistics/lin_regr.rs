@@ -1,11 +1,11 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
+use primitive::iter::AssertIteratorItemExt;
 use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
 
 use crate::{
-    iter::AssertIteratorItemExt,
-    lin_alg::{Index, Matrix},
+    matrix::{Container2D, Index, Matrix},
     statistics::variance::VarianceExt,
     transformer::Estimate,
 };
@@ -94,7 +94,7 @@ pub enum ExamplesError {
 }
 
 #[allow(non_snake_case)]
-fn XTX_inv<V>(examples: impl Iterator<Item = V> + Clone) -> Result<Matrix, ExamplesError>
+fn XTX_inv<V>(examples: impl Iterator<Item = V> + Clone) -> Result<Matrix<Vec<f64>>, ExamplesError>
 where
     V: Sample,
 {
@@ -319,7 +319,7 @@ pub enum TTestParamsError {
 
 #[cfg(test)]
 mod tests {
-    use crate::float::FloatExt;
+    use primitive::float::FloatExt;
 
     use super::*;
 

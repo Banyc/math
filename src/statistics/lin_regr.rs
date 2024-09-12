@@ -64,7 +64,7 @@ where
 
         let mut slopes = vec![];
         for row in 0..b.size().rows.get() {
-            let slope = b.cell(Index { row, col: 0 });
+            let slope = b.get(Index { row, col: 0 });
             slopes.push(slope);
         }
         Ok(LinearRegression::new(slopes))
@@ -274,7 +274,7 @@ where
     let mut slope_standard_errors = vec![];
     for i in 1..=k {
         let index = Index { row: i, col: i };
-        let value = XTX_inv.cell(index);
+        let value = XTX_inv.get(index);
         let se = residual_standard_error * value.sqrt();
         slope_standard_errors.push(se);
     }

@@ -48,7 +48,7 @@ where
     fn size(&self) -> Size {
         self.size
     }
-    fn cell(&self, index: Index) -> F {
+    fn get(&self, index: Index) -> F {
         let index = self.index_2_to_1(index);
         self.data.as_slice()[index]
     }
@@ -58,7 +58,7 @@ where
     T: SeqMut<F>,
     F: Float,
 {
-    fn set_cell(&mut self, index: Index, value: F) {
+    fn set(&mut self, index: Index, value: F) {
         let index = self.index_2_to_1(index);
         self.data.as_slice_mut()[index] = value;
     }
@@ -90,7 +90,7 @@ where
         let mut matrix = Self::zero(size);
         for row in 0..rows.get() {
             let index = Index { row, col: row };
-            matrix.set_cell(index, One::one());
+            matrix.set(index, One::one());
         }
         matrix
     }
@@ -178,11 +178,11 @@ where
         let cols = NonZeroUsize::new(cols).unwrap();
         Size { rows, cols }
     }
-    fn cell(&self, index: Index) -> F {
+    fn get(&self, index: Index) -> F {
         let row = index.row + self.start.row;
         let col = index.col + self.start.col;
         let index = Index { row, col };
-        self.orig_matrix.cell(index)
+        self.orig_matrix.get(index)
     }
 }
 impl<T, F> PartialMatrix<'_, T, F>
@@ -230,10 +230,10 @@ where
 
 pub trait Container2D<T> {
     fn size(&self) -> Size;
-    fn cell(&self, index: Index) -> T;
+    fn get(&self, index: Index) -> T;
 }
 pub trait Container2DMut<T>: Container2D<T> {
-    fn set_cell(&mut self, index: Index, value: T);
+    fn set(&mut self, index: Index, value: T);
 }
 pub trait Matrix<T>: Container2D<T>
 where
@@ -246,9 +246,9 @@ where
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
-                let value = self.cell(index);
+                let value = self.get(index);
                 let value = op(value);
-                self.set_cell(index, value);
+                self.set(index, value);
             }
         }
     }
@@ -260,10 +260,10 @@ where
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
-                let other = other.cell(index);
-                let this = self.cell(index);
+                let other = other.get(index);
+                let this = self.get(index);
                 let value = op(this, other);
-                self.set_cell(index, value);
+                self.set(index, value);
             }
         }
     }
@@ -272,8 +272,8 @@ where
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
-                let other = other.cell(index);
-                let this = self.cell(index);
+                let other = other.get(index);
+                let this = self.get(index);
                 if !this.closes_to(other) {
                     return false;
                 }
@@ -298,12 +298,12 @@ where
                 for i in 0..self.size().cols.get() {
                     let a = Index { row, col: i };
                     let b = Index { row: i, col };
-                    let a = self.cell(a);
-                    let b = other.cell(b);
+                    let a = self.get(a);
+                    let b = other.get(b);
                     sum = sum + (a * b);
                 }
 
-                out.set_cell(index, sum);
+                out.set(index, sum);
             }
         }
     }
@@ -318,9 +318,9 @@ where
         assert_eq!(out.size(), self.transpose_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let value = self.cell(Index { row, col });
+                let value = self.get(Index { row, col });
                 let index = Index { row: col, col: row };
-                out.set_cell(index, value);
+                out.set(index, value);
             }
         }
     }
@@ -337,11 +337,11 @@ where
         Size { rows, cols }
     }
     fn exclude_cross_in(&self, index: Index, out: &mut impl Container2DMut<T>) {
-        let _valid = self.cell(index);
+        let _valid = self.get(index);
         assert_eq!(out.size(), self.exclude_cross_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let value = self.cell(Index { row, col });
+                let value = self.get(Index { row, col });
                 let row = match row.cmp(&index.row) {
                     std::cmp::Ordering::Less => row,
                     std::cmp::Ordering::Equal => continue,
@@ -353,7 +353,7 @@ where
                     std::cmp::Ordering::Greater => col - 1,
                 };
                 let index = Index { row, col };
-                out.set_cell(index, value);
+                out.set(index, value);
             }
         }
     }
@@ -363,11 +363,11 @@ where
             panic!("not a square matrix");
         }
         if self.size().rows.get() == 1 {
-            return self.cell(Index { row: 0, col: 0 });
+            return self.get(Index { row: 0, col: 0 });
         }
         if self.size().rows.get() == 2 {
-            return self.cell(Index { row: 0, col: 0 }) * self.cell(Index { row: 1, col: 1 })
-                - self.cell(Index { row: 0, col: 1 }) * self.cell(Index { row: 1, col: 0 });
+            return self.get(Index { row: 0, col: 0 }) * self.get(Index { row: 1, col: 1 })
+                - self.get(Index { row: 0, col: 1 }) * self.get(Index { row: 1, col: 0 });
         }
 
         let mut matrix = VecMatrixBuf::<T>::zero(self.exclude_cross_size());
@@ -375,7 +375,7 @@ where
         let mut alt_sign = One::one();
         for col in 0..self.size().cols.get() {
             let index = Index { row: 0, col };
-            let value = self.cell(index);
+            let value = self.get(index);
             self.exclude_cross_in(index, &mut matrix);
             let det = matrix.determinant();
             sum = sum + (value * det * alt_sign);
@@ -399,7 +399,7 @@ where
                 let index = Index { row, col };
                 self.exclude_cross_in(index, exclude_cross);
                 let det = exclude_cross.determinant();
-                out.set_cell(index, det);
+                out.set(index, det);
             }
         }
     }
@@ -419,8 +419,8 @@ where
                 let sign = if is_even { 1. } else { -1. };
                 let sign = T::from(sign).unwrap();
                 let index = Index { row, col };
-                let value = out.cell(index);
-                out.set_cell(index, value * sign);
+                let value = out.get(index);
+                out.set(index, value * sign);
             }
         }
     }
@@ -471,12 +471,12 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let matrix = MatrixBuf::new(size, data);
-        assert_eq!(matrix.cell(Index { row: 0, col: 0 }), 0.);
-        assert_eq!(matrix.cell(Index { row: 0, col: 1 }), 1.);
-        assert_eq!(matrix.cell(Index { row: 0, col: 2 }), 2.);
-        assert_eq!(matrix.cell(Index { row: 1, col: 0 }), 3.);
-        assert_eq!(matrix.cell(Index { row: 1, col: 1 }), 4.);
-        assert_eq!(matrix.cell(Index { row: 1, col: 2 }), 5.);
+        assert_eq!(matrix.get(Index { row: 0, col: 0 }), 0.);
+        assert_eq!(matrix.get(Index { row: 0, col: 1 }), 1.);
+        assert_eq!(matrix.get(Index { row: 0, col: 2 }), 2.);
+        assert_eq!(matrix.get(Index { row: 1, col: 0 }), 3.);
+        assert_eq!(matrix.get(Index { row: 1, col: 1 }), 4.);
+        assert_eq!(matrix.get(Index { row: 1, col: 2 }), 5.);
     }
 
     #[test]

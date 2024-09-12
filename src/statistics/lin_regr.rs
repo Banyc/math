@@ -5,7 +5,7 @@ use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
 
 use crate::{
-    matrix::{Container2D, Index, Matrix},
+    matrix::{Container2D, Index, Matrix, Size},
     statistics::variance::VarianceExt,
     transformer::Estimate,
 };
@@ -54,12 +54,16 @@ where
         XTy_data.push(y_sum);
         XTy_data.extend(x_y_sums.iter().copied());
         let XTy_rows = NonZeroUsize::new(k.get() + 1).unwrap();
-        let XTy = Matrix::new(XTy_rows, XTy_data);
+        let size = Size {
+            rows: XTy_rows,
+            cols: NonZeroUsize::new(1).unwrap(),
+        };
+        let XTy = Matrix::new(size, XTy_data);
 
         let b = XTX_inv.mul_matrix(&XTy);
 
         let mut slopes = vec![];
-        for row in 0..b.rows().get() {
+        for row in 0..b.size().rows.get() {
             let slope = b.cell(Index { row, col: 0 });
             slopes.push(slope);
         }
@@ -147,7 +151,11 @@ where
             XTX_data.push(*x_x_sums.get(&(min, max)).unwrap());
         }
     }
-    let XTX = Matrix::new(XTX_rows, XTX_data);
+    let size = Size {
+        rows: XTX_rows,
+        cols: XTX_rows,
+    };
+    let XTX = Matrix::new(size, XTX_data);
     Ok(XTX.inverse())
 }
 

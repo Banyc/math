@@ -279,10 +279,6 @@ where
 pub trait Container2D<T> {
     fn size(&self) -> Size;
     fn cell(&self, index: Index) -> T;
-
-    fn is_square(&self) -> bool {
-        self.size().rows == self.size().cols
-    }
 }
 pub trait Container2DMut<T>: Container2D<T> {
     fn set_cell(&mut self, index: Index, value: T);
@@ -291,6 +287,10 @@ pub trait Matrix<T>: Container2D<T>
 where
     T: Float,
 {
+    fn is_square(&self) -> bool {
+        self.size().rows == self.size().cols
+    }
+
     fn cell_wise_mut_scalar(&mut self, op: impl Fn(T) -> T)
     where
         Self: Container2DMut<T>,

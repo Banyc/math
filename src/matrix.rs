@@ -1,6 +1,6 @@
-use std::num::NonZeroUsize;
+use std::{marker::PhantomData, num::NonZeroUsize};
 
-use num_traits::{Float, Zero};
+use num_traits::{Float, One, Zero};
 use primitive::{float::FloatExt, seq::Seq};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,55 +27,62 @@ impl Size {
 }
 
 #[derive(Debug, Clone)]
-pub struct MatrixBuf<T> {
+pub struct MatrixBuf<T, F> {
     size: Size,
     data: T,
+    float: PhantomData<F>,
 }
-impl<T> Container2D for MatrixBuf<T>
+impl<T, F> Container2D<F> for MatrixBuf<T, F>
 where
-    T: Seq<f64>,
+    T: Seq<F>,
+    F: Float,
 {
-    type Item = f64;
     fn size(&self) -> Size {
         self.size
     }
-    fn cell(&self, index: Index) -> Self::Item {
+    fn cell(&self, index: Index) -> F {
         let index = self.index_2_to_1(index);
         self.data.as_slice()[index]
     }
 }
-impl<T> Container2DMut for MatrixBuf<T>
+impl<T, F> Container2DMut<F> for MatrixBuf<T, F>
 where
-    T: Seq<f64>,
+    T: Seq<F>,
+    F: Float,
 {
-    fn set_cell(&mut self, index: Index, value: Self::Item) {
+    fn set_cell(&mut self, index: Index, value: F) {
         let index = self.index_2_to_1(index);
         self.data.as_slice_mut()[index] = value;
     }
 }
-impl<T> MatrixBuf<T>
+impl<T, F> MatrixBuf<T, F>
 where
-    T: Seq<f64>,
+    T: Seq<F>,
+    F: Float,
 {
     pub fn new(size: Size, data: T) -> Self {
         if size.volume().get() < data.as_slice().len() {
             panic!("not enough buffer size");
         }
-        Self { size, data }
+        Self {
+            size,
+            data,
+            float: PhantomData,
+        }
     }
     pub fn into_buffer(self) -> T {
         self.data
     }
-    pub fn zero(size: Size) -> MatrixBuf<Vec<f64>> {
-        let data = vec![0.; size.volume().get()];
+    pub fn zero(size: Size) -> MatrixBuf<Vec<F>, F> {
+        let data = vec![Zero::zero(); size.volume().get()];
         MatrixBuf::new(size, data)
     }
-    pub fn identity(rows: NonZeroUsize) -> MatrixBuf<Vec<f64>> {
+    pub fn identity(rows: NonZeroUsize) -> MatrixBuf<Vec<F>, F> {
         let size = Size { rows, cols: rows };
         let mut matrix = Self::zero(size);
         for row in 0..rows.get() {
             let index = Index { row, col: row };
-            matrix.set_cell(index, 1.);
+            matrix.set_cell(index, One::one());
         }
         matrix
     }
@@ -103,14 +110,14 @@ where
         self.transpose_in(&mut out);
         out
     }
-    pub fn determinant(&self) -> f64 {
+    pub fn determinant(&self) -> F {
         self.full_partial().determinant()
     }
-    pub fn inverse(&self) -> MatrixBuf<Vec<f64>> {
+    pub fn inverse(&self) -> MatrixBuf<Vec<F>, F> {
         self.full_partial().inverse()
     }
 
-    fn full_partial(&self) -> PartialMatrix<'_, T> {
+    fn full_partial(&self) -> PartialMatrix<'_, T, F> {
         let start = Index { row: 0, col: 0 };
         let end = Index {
             row: self.size().rows.get(),
@@ -119,23 +126,24 @@ where
         PartialMatrix::new(self, start, end)
     }
 
-    pub fn mul_matrix(&self, other: &impl Container2D<Item = f64>) -> MatrixBuf<Vec<f64>> {
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> MatrixBuf<Vec<F>, F> {
         self.full_partial().mul_matrix(other)
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct PartialMatrix<'orig, T> {
-    orig_matrix: &'orig MatrixBuf<T>,
+pub struct PartialMatrix<'orig, T, F> {
+    orig_matrix: &'orig MatrixBuf<T, F>,
     start: Index,
     /// exclusive
     end: Index,
 }
-impl<'orig, T> PartialMatrix<'orig, T> {
-    pub fn new(matrix: &'orig MatrixBuf<T>, start: Index, end: Index) -> Self
-    where
-        T: Seq<f64>,
-    {
+impl<'orig, T, F> PartialMatrix<'orig, T, F>
+where
+    T: Seq<F>,
+    F: Float,
+{
+    pub fn new(matrix: &'orig MatrixBuf<T, F>, start: Index, end: Index) -> Self {
         let start_in_bound =
             start.row < matrix.size().rows.get() && start.col < matrix.size().cols.get();
         let end_in_bound =
@@ -152,11 +160,11 @@ impl<'orig, T> PartialMatrix<'orig, T> {
         }
     }
 }
-impl<T> Container2D for PartialMatrix<'_, T>
+impl<T, F> Container2D<F> for PartialMatrix<'_, T, F>
 where
-    T: Seq<f64>,
+    T: Seq<F>,
+    F: Float,
 {
-    type Item = f64;
     fn size(&self) -> Size {
         let rows = self.end.row - self.start.row;
         let rows = NonZeroUsize::new(rows).unwrap();
@@ -164,27 +172,28 @@ where
         let cols = NonZeroUsize::new(cols).unwrap();
         Size { rows, cols }
     }
-    fn cell(&self, index: Index) -> Self::Item {
+    fn cell(&self, index: Index) -> F {
         let row = index.row + self.start.row;
         let col = index.col + self.start.col;
         let index = Index { row, col };
         self.orig_matrix.cell(index)
     }
 }
-impl<T> PartialMatrix<'_, T>
+impl<T, F> PartialMatrix<'_, T, F>
 where
-    T: Seq<f64>,
+    T: Seq<F>,
+    F: Float,
 {
-    pub fn transpose(&self) -> MatrixBuf<Vec<f64>> {
+    pub fn transpose(&self) -> MatrixBuf<Vec<F>, F> {
         let size = Size {
             rows: self.size().cols,
             cols: self.size().rows,
         };
-        let mut matrix = MatrixBuf::<Vec<f64>>::zero(size);
+        let mut matrix = MatrixBuf::<Vec<F>, F>::zero(size);
         self.transpose_in(&mut matrix);
         matrix
     }
-    pub fn determinant(&self) -> f64 {
+    pub fn determinant(&self) -> F {
         if !self.is_square() {
             panic!("not a square matrix");
         }
@@ -196,35 +205,35 @@ where
                 - self.cell(Index { row: 0, col: 1 }) * self.cell(Index { row: 1, col: 0 });
         }
 
-        let mut matrix = MatrixBuf::<Vec<f64>>::zero(self.exclude_cross_size());
-        let mut sum = 0.;
-        let mut alt_sign = 1.;
+        let mut matrix = MatrixBuf::<Vec<F>, F>::zero(self.exclude_cross_size());
+        let mut sum = Zero::zero();
+        let mut alt_sign = One::one();
         for col in 0..self.size().cols.get() {
             let index = Index { row: 0, col };
             let value = self.cell(index);
             self.exclude_cross_in(index, &mut matrix);
             let det = matrix.determinant();
-            sum += value * det * alt_sign;
-            alt_sign *= -1.;
+            sum = sum + (value * det * alt_sign);
+            alt_sign = alt_sign.neg();
         }
 
         sum
     }
 
-    pub fn inverse(&self) -> MatrixBuf<Vec<f64>> {
+    pub fn inverse(&self) -> MatrixBuf<Vec<F>, F> {
         let det = self.determinant();
         let mut matrix = self.adjugate();
         matrix.cell_wise_mut_scalar(|x| x / det);
         matrix
     }
 
-    pub fn adjugate(&self) -> MatrixBuf<Vec<f64>> {
+    pub fn adjugate(&self) -> MatrixBuf<Vec<F>, F> {
         self.matrix_of_cofactors().transpose()
     }
 
-    pub fn matrix_of_minors(&self) -> MatrixBuf<Vec<f64>> {
-        let mut matrix_of_minors = MatrixBuf::<Vec<f64>>::zero(self.size());
-        let mut exclude_cross = MatrixBuf::<Vec<f64>>::zero(self.exclude_cross_size());
+    pub fn matrix_of_minors(&self) -> MatrixBuf<Vec<F>, F> {
+        let mut matrix_of_minors = MatrixBuf::<Vec<F>, F>::zero(self.size());
+        let mut exclude_cross = MatrixBuf::<Vec<F>, F>::zero(self.exclude_cross_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
@@ -236,12 +245,13 @@ where
         matrix_of_minors
     }
 
-    pub fn matrix_of_cofactors(&self) -> MatrixBuf<Vec<f64>> {
+    pub fn matrix_of_cofactors(&self) -> MatrixBuf<Vec<F>, F> {
         let mut matrix = self.matrix_of_minors();
         for row in 0..matrix.size().rows.get() {
             for col in 0..matrix.size().cols.get() {
                 let is_even = (row + col) % 2 == 0;
                 let sign = if is_even { 1. } else { -1. };
+                let sign = F::from(sign).unwrap();
                 let index = Index { row, col };
                 let value = matrix.cell(index);
                 matrix.set_cell(index, value * sign);
@@ -250,7 +260,7 @@ where
         matrix
     }
 
-    pub fn mul_matrix(&self, other: &impl Container2D<Item = f64>) -> MatrixBuf<Vec<f64>> {
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> MatrixBuf<Vec<F>, F> {
         if self.size().cols != other.size().rows {
             panic!("unmatched matrix shapes for mul");
         }
@@ -258,31 +268,30 @@ where
             rows: self.size().rows,
             cols: other.size().cols,
         };
-        let mut matrix = MatrixBuf::<Vec<f64>>::zero(size);
+        let mut matrix = MatrixBuf::<Vec<F>, F>::zero(size);
         self.mul_matrix_in(other, &mut matrix);
         matrix
     }
 }
 
-pub trait Container2D {
-    type Item;
+pub trait Container2D<T> {
     fn size(&self) -> Size;
-    fn cell(&self, index: Index) -> Self::Item;
+    fn cell(&self, index: Index) -> T;
 
     fn is_square(&self) -> bool {
         self.size().rows == self.size().cols
     }
 }
-pub trait Container2DMut: Container2D {
-    fn set_cell(&mut self, index: Index, value: Self::Item);
+pub trait Container2DMut<T>: Container2D<T> {
+    fn set_cell(&mut self, index: Index, value: T);
 }
-pub trait Matrix: Container2D
+pub trait Matrix<T>: Container2D<T>
 where
-    Self::Item: Float,
+    T: Float,
 {
-    fn cell_wise_mut_scalar(&mut self, op: impl Fn(Self::Item) -> Self::Item)
+    fn cell_wise_mut_scalar(&mut self, op: impl Fn(T) -> T)
     where
-        Self: Container2DMut,
+        Self: Container2DMut<T>,
     {
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
@@ -293,12 +302,9 @@ where
             }
         }
     }
-    fn cell_wise_mut_matrix(
-        &mut self,
-        other: &impl Container2D<Item = Self::Item>,
-        op: impl Fn(Self::Item, Self::Item) -> Self::Item,
-    ) where
-        Self: Container2DMut,
+    fn cell_wise_mut_matrix(&mut self, other: &impl Container2D<T>, op: impl Fn(T, T) -> T)
+    where
+        Self: Container2DMut<T>,
     {
         assert_eq!(self.size(), other.size());
         for row in 0..self.size().rows.get() {
@@ -311,7 +317,7 @@ where
             }
         }
     }
-    fn closes_to(&self, other: &impl Container2D<Item = Self::Item>) -> bool {
+    fn closes_to(&self, other: &impl Container2D<T>) -> bool {
         assert_eq!(self.size(), other.size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
@@ -326,17 +332,13 @@ where
         true
     }
 
-    fn mul_matrix_size(&self, other: &impl Container2D<Item = Self::Item>) -> Size {
+    fn mul_matrix_size(&self, other: &impl Container2D<T>) -> Size {
         Size {
             rows: self.size().rows,
             cols: other.size().cols,
         }
     }
-    fn mul_matrix_in(
-        &self,
-        other: &impl Container2D<Item = Self::Item>,
-        out: &mut impl Container2DMut<Item = Self::Item>,
-    ) {
+    fn mul_matrix_in(&self, other: &impl Container2D<T>, out: &mut impl Container2DMut<T>) {
         assert_eq!(out.size(), self.mul_matrix_size(other));
         for row in 0..self.size().rows.get() {
             for col in 0..other.size().cols.get() {
@@ -362,7 +364,7 @@ where
             cols: self.size().rows,
         }
     }
-    fn transpose_in(&self, out: &mut impl Container2DMut<Item = Self::Item>) {
+    fn transpose_in(&self, out: &mut impl Container2DMut<T>) {
         assert_eq!(out.size(), self.transpose_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
@@ -384,7 +386,7 @@ where
         };
         Size { rows, cols }
     }
-    fn exclude_cross_in(&self, index: Index, out: &mut impl Container2DMut<Item = Self::Item>) {
+    fn exclude_cross_in(&self, index: Index, out: &mut impl Container2DMut<T>) {
         let _valid = self.cell(index);
         assert_eq!(out.size(), self.exclude_cross_size());
         for row in 0..self.size().rows.get() {
@@ -406,9 +408,9 @@ where
         }
     }
 }
-impl<T, F> Matrix for T
+impl<T, F> Matrix<F> for T
 where
-    T: Container2D<Item = F>,
+    T: Container2D<F>,
     F: Float,
 {
 }

@@ -100,7 +100,7 @@ pub enum ExamplesError {
 #[allow(non_snake_case)]
 fn XTX_inv<V>(
     examples: impl Iterator<Item = V> + Clone,
-) -> Result<MatrixBuf<Vec<f64>>, ExamplesError>
+) -> Result<MatrixBuf<Vec<f64>, f64>, ExamplesError>
 where
     V: Sample,
 {

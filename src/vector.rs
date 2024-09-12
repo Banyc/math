@@ -128,6 +128,28 @@ impl Vector<2> {
         self.rotate(0, 1, angle)
     }
 }
+impl Vector<3> {
+    /// The cross product is only defined in 3D space and takes two non-parallel vectors as input and produces a third vector that is orthogonal to both the input vectors.
+    /// - ref: <https://learnopengl.com/Getting-started/Transformations>
+    #[must_use]
+    pub fn cross(&self, other: &Self) -> Self {
+        let dims = [
+            FiniteF64::new(
+                self.dims[1].get() * other.dims[2].get() - self.dims[2].get() * other.dims[1].get(),
+            )
+            .unwrap(),
+            FiniteF64::new(
+                self.dims[2].get() * other.dims[0].get() - self.dims[0].get() * other.dims[2].get(),
+            )
+            .unwrap(),
+            FiniteF64::new(
+                self.dims[0].get() * other.dims[1].get() - self.dims[1].get() * other.dims[0].get(),
+            )
+            .unwrap(),
+        ];
+        Self { dims }
+    }
+}
 
 #[cfg(test)]
 mod tests {

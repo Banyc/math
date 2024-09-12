@@ -90,33 +90,6 @@ where
         index.to_1(self.size().cols)
     }
 
-    pub fn add_scalar(&mut self, value: f64) {
-        for cell in self.data.as_slice_mut() {
-            *cell += value;
-        }
-    }
-    pub fn mul_scalar(&mut self, value: f64) {
-        for cell in self.data.as_slice_mut() {
-            *cell *= value;
-        }
-    }
-
-    pub fn add_matrix(&mut self, other: &impl Container2D<Item = f64>) {
-        self.assert_same_shape(other);
-        for row in 0..self.size().rows.get() {
-            for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
-                let value = other.cell(index);
-                self.set_cell(index, value);
-            }
-        }
-    }
-    pub fn assert_same_shape(&self, other: &impl Container2D<Item = f64>) {
-        if self.size() != other.size() {
-            panic!("unmatched size");
-        }
-    }
-
     pub fn transpose(&self) -> Self
     where
         T: Clone,
@@ -144,21 +117,6 @@ where
             col: self.size().cols.get(),
         };
         PartialMatrix::new(self, start, end)
-    }
-
-    pub fn closes_to(&self, other: &impl Container2D<Item = f64>) -> bool {
-        self.assert_same_shape(other);
-        for row in 0..self.size().rows.get() {
-            for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
-                let other = other.cell(index);
-                let this = self.cell(index);
-                if !this.closes_to(other) {
-                    return false;
-                }
-            }
-        }
-        true
     }
 
     pub fn mul_matrix(&self, other: &impl Container2D<Item = f64>) -> MatrixBuf<Vec<f64>> {
@@ -256,7 +214,7 @@ where
     pub fn inverse(&self) -> MatrixBuf<Vec<f64>> {
         let det = self.determinant();
         let mut matrix = self.adjugate();
-        matrix.mul_scalar(1. / det);
+        matrix.cell_wise_mut_scalar(|x| x / det);
         matrix
     }
 
@@ -322,6 +280,52 @@ pub trait Matrix: Container2D
 where
     Self::Item: Float,
 {
+    fn cell_wise_mut_scalar(&mut self, op: impl Fn(Self::Item) -> Self::Item)
+    where
+        Self: Container2DMut,
+    {
+        for row in 0..self.size().rows.get() {
+            for col in 0..self.size().cols.get() {
+                let index = Index { row, col };
+                let value = self.cell(index);
+                let value = op(value);
+                self.set_cell(index, value);
+            }
+        }
+    }
+    fn cell_wise_mut_matrix(
+        &mut self,
+        other: &impl Container2D<Item = Self::Item>,
+        op: impl Fn(Self::Item, Self::Item) -> Self::Item,
+    ) where
+        Self: Container2DMut,
+    {
+        assert_eq!(self.size(), other.size());
+        for row in 0..self.size().rows.get() {
+            for col in 0..self.size().cols.get() {
+                let index = Index { row, col };
+                let other = other.cell(index);
+                let this = self.cell(index);
+                let value = op(this, other);
+                self.set_cell(index, value);
+            }
+        }
+    }
+    fn closes_to(&self, other: &impl Container2D<Item = Self::Item>) -> bool {
+        assert_eq!(self.size(), other.size());
+        for row in 0..self.size().rows.get() {
+            for col in 0..self.size().cols.get() {
+                let index = Index { row, col };
+                let other = other.cell(index);
+                let this = self.cell(index);
+                if !this.closes_to(other) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
     fn mul_matrix_size(&self, other: &impl Container2D<Item = Self::Item>) -> Size {
         Size {
             rows: self.size().rows,
@@ -437,7 +441,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.add_scalar(1.);
+        matrix.cell_wise_mut_scalar(|x| x + 1.);
         let expected = MatrixBuf::new(size, vec![1., 2., 3., 4., 5., 6.]);
         assert!(matrix.closes_to(&expected));
     }
@@ -450,7 +454,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.mul_scalar(2.);
+        matrix.cell_wise_mut_scalar(|x| x * 2.);
         let expected = MatrixBuf::new(size, vec![0., 2., 4., 6., 8., 10.]);
         assert!(matrix.closes_to(&expected));
     }

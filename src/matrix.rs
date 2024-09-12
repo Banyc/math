@@ -26,6 +26,8 @@ impl Size {
     }
 }
 
+pub type ArrayMatrixBuf<F, const N: usize> = MatrixBuf<[F; N], F>;
+pub type VecMatrixBuf<F> = MatrixBuf<Vec<F>, F>;
 #[derive(Debug, Clone)]
 pub struct MatrixBuf<T, F> {
     size: Size,
@@ -73,11 +75,11 @@ where
     pub fn into_buffer(self) -> T {
         self.data
     }
-    pub fn zero(size: Size) -> MatrixBuf<Vec<F>, F> {
+    pub fn zero(size: Size) -> VecMatrixBuf<F> {
         let data = vec![Zero::zero(); size.volume().get()];
         MatrixBuf::new(size, data)
     }
-    pub fn identity(rows: NonZeroUsize) -> MatrixBuf<Vec<F>, F> {
+    pub fn identity(rows: NonZeroUsize) -> VecMatrixBuf<F> {
         let size = Size { rows, cols: rows };
         let mut matrix = Self::zero(size);
         for row in 0..rows.get() {
@@ -113,7 +115,7 @@ where
     pub fn determinant(&self) -> F {
         self.full_partial().determinant()
     }
-    pub fn inverse(&self) -> MatrixBuf<Vec<F>, F> {
+    pub fn inverse(&self) -> VecMatrixBuf<F> {
         self.full_partial().inverse()
     }
 
@@ -126,7 +128,7 @@ where
         PartialMatrix::new(self, start, end)
     }
 
-    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> MatrixBuf<Vec<F>, F> {
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
         self.full_partial().mul_matrix(other)
     }
 }
@@ -184,12 +186,12 @@ where
     T: Seq<F>,
     F: Float,
 {
-    pub fn transpose(&self) -> MatrixBuf<Vec<F>, F> {
+    pub fn transpose(&self) -> VecMatrixBuf<F> {
         let size = Size {
             rows: self.size().cols,
             cols: self.size().rows,
         };
-        let mut matrix = MatrixBuf::<Vec<F>, F>::zero(size);
+        let mut matrix = VecMatrixBuf::<F>::zero(size);
         self.transpose_in(&mut matrix);
         matrix
     }
@@ -205,7 +207,7 @@ where
                 - self.cell(Index { row: 0, col: 1 }) * self.cell(Index { row: 1, col: 0 });
         }
 
-        let mut matrix = MatrixBuf::<Vec<F>, F>::zero(self.exclude_cross_size());
+        let mut matrix = VecMatrixBuf::<F>::zero(self.exclude_cross_size());
         let mut sum = Zero::zero();
         let mut alt_sign = One::one();
         for col in 0..self.size().cols.get() {
@@ -220,20 +222,20 @@ where
         sum
     }
 
-    pub fn inverse(&self) -> MatrixBuf<Vec<F>, F> {
+    pub fn inverse(&self) -> VecMatrixBuf<F> {
         let det = self.determinant();
         let mut matrix = self.adjugate();
         matrix.cell_wise_mut_scalar(|x| x / det);
         matrix
     }
 
-    pub fn adjugate(&self) -> MatrixBuf<Vec<F>, F> {
+    pub fn adjugate(&self) -> VecMatrixBuf<F> {
         self.matrix_of_cofactors().transpose()
     }
 
-    pub fn matrix_of_minors(&self) -> MatrixBuf<Vec<F>, F> {
-        let mut matrix_of_minors = MatrixBuf::<Vec<F>, F>::zero(self.size());
-        let mut exclude_cross = MatrixBuf::<Vec<F>, F>::zero(self.exclude_cross_size());
+    pub fn matrix_of_minors(&self) -> VecMatrixBuf<F> {
+        let mut matrix_of_minors = VecMatrixBuf::<F>::zero(self.size());
+        let mut exclude_cross = VecMatrixBuf::<F>::zero(self.exclude_cross_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
@@ -245,7 +247,7 @@ where
         matrix_of_minors
     }
 
-    pub fn matrix_of_cofactors(&self) -> MatrixBuf<Vec<F>, F> {
+    pub fn matrix_of_cofactors(&self) -> VecMatrixBuf<F> {
         let mut matrix = self.matrix_of_minors();
         for row in 0..matrix.size().rows.get() {
             for col in 0..matrix.size().cols.get() {
@@ -260,7 +262,7 @@ where
         matrix
     }
 
-    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> MatrixBuf<Vec<F>, F> {
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
         if self.size().cols != other.size().rows {
             panic!("unmatched matrix shapes for mul");
         }
@@ -268,7 +270,7 @@ where
             rows: self.size().rows,
             cols: other.size().cols,
         };
-        let mut matrix = MatrixBuf::<Vec<F>, F>::zero(size);
+        let mut matrix = VecMatrixBuf::<F>::zero(size);
         self.mul_matrix_in(other, &mut matrix);
         matrix
     }

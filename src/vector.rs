@@ -1,6 +1,11 @@
+use std::num::NonZeroUsize;
+
 use strict_num::{FiniteF64, NormalizedF64};
 
-use crate::graphics::lerp;
+use crate::{
+    graphics::lerp,
+    matrix::{self, Container2D},
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector<const N: usize> {
@@ -148,6 +153,37 @@ impl Vector<3> {
             .unwrap(),
         ];
         Self { dims }
+    }
+}
+impl<const N: usize> From<Vector<N>> for matrix::ArrayMatrixBuf<f64, N> {
+    fn from(value: Vector<N>) -> Self {
+        let size = matrix::Size {
+            rows: NonZeroUsize::new(N).unwrap(),
+            cols: NonZeroUsize::new(1).unwrap(),
+        };
+        let data = value.dims.map(|x| x.get());
+        matrix::ArrayMatrixBuf::new(size, data)
+    }
+}
+impl<const N: usize> Vector<N> {
+    pub fn try_from_matrix<M>(matrix: M) -> Option<Self>
+    where
+        M: Container2D<f64>,
+    {
+        let size = matrix::Size {
+            rows: NonZeroUsize::new(N).unwrap(),
+            cols: NonZeroUsize::new(1).unwrap(),
+        };
+        if matrix.size() != size {
+            return None;
+        }
+        let mut dims = [FiniteF64::new(0.).unwrap(); N];
+        for (i, row) in dims.iter_mut().enumerate() {
+            let index = matrix::Index { row: i, col: 0 };
+            let value = matrix.get(index);
+            *row = FiniteF64::new(value).unwrap();
+        }
+        Some(Self::new(dims))
     }
 }
 

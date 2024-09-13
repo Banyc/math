@@ -256,7 +256,7 @@ pub trait Matrix<T>: Container2D<T>
 where
     T: Float,
 {
-    fn for_each(&mut self, op: impl Fn(T) -> T)
+    fn for_each_mut(&mut self, op: impl Fn(T) -> T)
     where
         Self: Container2DMut<T>,
     {
@@ -463,7 +463,7 @@ where
     {
         let det = self.determinant();
         self.adjugate_in(matrix_of_cofactors, out);
-        out.for_each(|x| x / det);
+        out.for_each_mut(|x| x / det);
     }
 }
 impl<T, F> Matrix<F> for T
@@ -501,7 +501,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.for_each(|x| x + 1.);
+        matrix.for_each_mut(|x| x + 1.);
         let expected = MatrixBuf::new(size, vec![1., 2., 3., 4., 5., 6.]);
         assert!(matrix.closes_to(&expected));
     }
@@ -514,7 +514,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.for_each(|x| x * 2.);
+        matrix.for_each_mut(|x| x * 2.);
         let expected = MatrixBuf::new(size, vec![0., 2., 4., 6., 8., 10.]);
         assert!(matrix.closes_to(&expected));
     }
@@ -644,5 +644,11 @@ mod tests {
             ],
         );
         assert!(matrix.closes_to(&expected));
+    }
+
+    #[test]
+    fn test_vec_expand() {
+        let mut v = vec![0; 1];
+        v.push(1);
     }
 }

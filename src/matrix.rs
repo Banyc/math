@@ -154,6 +154,19 @@ where
         index.to_1(self.size().cols)
     }
 }
+impl<const N: usize, F> ArrayMatrixBuf<F, N>
+where
+    F: Float,
+{
+    pub fn mul_matrix_square(&self, other: &Self) -> Self {
+        assert_eq!(self.size(), other.size());
+        assert_eq!(self.size().rows, self.size().cols);
+        let data = [Zero::zero(); N];
+        let mut out = Self::new(self.size(), data);
+        self.mul_matrix_in(other, &mut out);
+        out
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct PartialMatrix<'orig, T, F> {

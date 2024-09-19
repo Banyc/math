@@ -99,19 +99,6 @@ where
     pub fn into_buffer(self) -> T {
         self.data
     }
-    pub fn zero(size: Size) -> VecMatrixBuf<F> {
-        let data = vec![Zero::zero(); size.volume().get()];
-        MatrixBuf::new(size, data)
-    }
-    pub fn identity(rows: NonZeroUsize) -> VecMatrixBuf<F> {
-        let size = Size { rows, cols: rows };
-        let mut matrix = Self::zero(size);
-        for row in 0..rows.get() {
-            let index = Index { row, col: row };
-            matrix.set(index, One::one());
-        }
-        matrix
-    }
 
     pub fn transpose(&self) -> Self
     where
@@ -154,10 +141,36 @@ where
         index.to_1(self.size().cols)
     }
 }
+impl<F> VecMatrixBuf<F>
+where
+    F: Float,
+{
+    pub fn zero(size: Size) -> Self {
+        let data = vec![Zero::zero(); size.volume().get()];
+        MatrixBuf::new(size, data)
+    }
+    pub fn identity(rows: NonZeroUsize) -> Self {
+        let size = Size { rows, cols: rows };
+        let mut matrix = Self::zero(size);
+        identity(rows, &mut matrix);
+        matrix
+    }
+}
 impl<const N: usize, F> ArrayMatrixBuf<F, N>
 where
     F: Float,
 {
+    pub fn zero(size: Size) -> Self {
+        let data = [Zero::zero(); N];
+        MatrixBuf::new(size, data)
+    }
+    pub fn identity(rows: NonZeroUsize) -> Self {
+        let size = Size { rows, cols: rows };
+        let mut matrix = Self::zero(size);
+        identity(rows, &mut matrix);
+        matrix
+    }
+
     pub fn mul_matrix_square(&self, other: &Self) -> Self {
         assert_eq!(self.size(), other.size());
         assert_eq!(self.size().rows, self.size().cols);
@@ -165,6 +178,15 @@ where
         let mut out = Self::new(self.size(), data);
         self.mul_matrix_in(other, &mut out);
         out
+    }
+}
+fn identity<T>(rows: NonZeroUsize, zero: &mut impl Container2DMut<T>)
+where
+    T: One,
+{
+    for row in 0..rows.get() {
+        let index = Index { row, col: row };
+        zero.set(index, One::one());
     }
 }
 

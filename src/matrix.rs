@@ -3,6 +3,7 @@ use std::{marker::PhantomData, num::NonZeroUsize};
 use num_traits::{Float, One, Zero};
 use primitive::{
     float::FloatExt,
+    iter::Lookahead1,
     seq::{Seq, SeqMut},
 };
 
@@ -121,6 +122,9 @@ where
     }
     pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
         self.full_partial().mul_matrix(other)
+    }
+    pub fn submatrix(&self, excluded_rows: &[usize], excluded_cols: &[usize]) -> VecMatrixBuf<F> {
+        self.full_partial().submatrix(excluded_rows, excluded_cols)
     }
 
     fn full_partial(&self) -> PartialMatrix<'_, T, F> {
@@ -273,6 +277,13 @@ where
         matrix
     }
 
+    pub fn submatrix(&self, excluded_rows: &[usize], excluded_cols: &[usize]) -> VecMatrixBuf<F> {
+        let mut out =
+            VecMatrixBuf::<F>::zero(self.submatrix_size(excluded_rows.len(), excluded_cols.len()));
+        self.submatrix_in(excluded_rows, excluded_cols, &mut out);
+        out
+    }
+
     pub fn collect(&self) -> VecMatrixBuf<F> {
         let mut out = VecMatrixBuf::zero(self.size());
         out.zip_mut(self, |_, x| x);
@@ -377,9 +388,9 @@ where
         }
     }
 
-    fn exclude_cross_size(&self) -> Size {
-        let rows = self.size().rows.get() - 1;
-        let cols = self.size().cols.get() - 1;
+    fn submatrix_size(&self, excluded_rows: usize, excluded_cols: usize) -> Size {
+        let rows = self.size().rows.get().checked_sub(excluded_rows).unwrap();
+        let cols = self.size().cols.get().checked_sub(excluded_cols).unwrap();
         let Some(rows) = NonZeroUsize::new(rows) else {
             panic!("zero rows");
         };
@@ -388,26 +399,52 @@ where
         };
         Size { rows, cols }
     }
-    fn exclude_cross_in(&self, index: Index, out: &mut impl Container2DMut<T>) {
-        let _valid = self.get(index);
-        assert_eq!(out.size(), self.exclude_cross_size());
+    fn submatrix_in(
+        &self,
+        excluded_rows: &[usize],
+        excluded_cols: &[usize],
+        out: &mut impl Container2DMut<T>,
+    ) {
+        assert_eq!(
+            out.size(),
+            self.submatrix_size(excluded_rows.len(), excluded_cols.len())
+        );
+        let excluded_rows_len = excluded_rows.len();
+        let mut excluded_rows = Lookahead1::new(excluded_rows.iter().copied());
+        let mut row_i = 0;
         for row in 0..self.size().rows.get() {
-            for col in 0..self.size().cols.get() {
-                let value = self.get(Index { row, col });
-                let row = match row.cmp(&index.row) {
-                    std::cmp::Ordering::Less => row,
-                    std::cmp::Ordering::Equal => continue,
-                    std::cmp::Ordering::Greater => row - 1,
-                };
-                let col = match col.cmp(&index.col) {
-                    std::cmp::Ordering::Less => col,
-                    std::cmp::Ordering::Equal => continue,
-                    std::cmp::Ordering::Greater => col - 1,
-                };
-                let index = Index { row, col };
-                out.set(index, value);
+            if Some(row) == excluded_rows.peek().copied() {
+                excluded_rows.pop();
+                continue;
             }
+            let excluded_cols_len = excluded_cols.len();
+            let mut excluded_cols = Lookahead1::new(excluded_cols.iter().copied());
+            let mut col_i = 0;
+            for col in 0..self.size().cols.get() {
+                if Some(col) == excluded_cols.peek().copied() {
+                    excluded_cols.pop();
+                    continue;
+                }
+                let value = self.get(Index { row, col });
+                let index = Index {
+                    row: row_i,
+                    col: col_i,
+                };
+                out.set(index, value);
+                col_i += 1;
+            }
+            assert_eq!(
+                col_i + excluded_cols_len,
+                self.size().cols.get(),
+                "unordered `excluded_cols`"
+            );
+            row_i += 1;
         }
+        assert_eq!(
+            row_i + excluded_rows_len,
+            self.size().rows.get(),
+            "unordered `excluded_rows`"
+        );
     }
 
     fn determinant(&self) -> T {
@@ -422,13 +459,13 @@ where
                 - self.get(Index { row: 0, col: 1 }) * self.get(Index { row: 1, col: 0 });
         }
 
-        let mut matrix = VecMatrixBuf::<T>::zero(self.exclude_cross_size());
+        let mut matrix = VecMatrixBuf::<T>::zero(self.submatrix_size(1, 1));
         let mut sum = Zero::zero();
         let mut alt_sign = One::one();
         for col in 0..self.size().cols.get() {
             let index = Index { row: 0, col };
             let value = self.get(index);
-            self.exclude_cross_in(index, &mut matrix);
+            self.submatrix_in(&[0], &[col], &mut matrix);
             let det = matrix.determinant();
             sum = sum + (value * det * alt_sign);
             alt_sign = alt_sign.neg();
@@ -449,7 +486,7 @@ where
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
-                self.exclude_cross_in(index, exclude_cross);
+                self.submatrix_in(&[row], &[col], exclude_cross);
                 let det = exclude_cross.determinant();
                 out.set(index, det);
             }
@@ -484,7 +521,7 @@ where
     where
         O: Container2DMut<T> + SeqMut<T>,
     {
-        let mut exclude_cross = MatrixBuf::new(self.exclude_cross_size(), out.as_slice_mut());
+        let mut exclude_cross = MatrixBuf::new(self.submatrix_size(1, 1), out.as_slice_mut());
         self.matrix_of_cofactors_in(&mut exclude_cross, matrix_of_cofactors);
         matrix_of_cofactors.transpose_in(out);
     }

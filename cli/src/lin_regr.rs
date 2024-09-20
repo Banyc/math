@@ -23,7 +23,7 @@ impl LinRegrArgs {
         let df = read_df_file(self.input)?;
 
         let mut columns = vec![];
-        columns.extend(self.x.iter().map(|s| col(s)));
+        columns.extend(self.x.iter().map(col));
         columns.push(col(&self.y));
 
         let df = df.select(&columns).collect()?;

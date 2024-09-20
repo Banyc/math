@@ -5,9 +5,13 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-banyc_polars_util = { version = "0.2" }
+banyc_polars_util = { version = "0.3" }
 clap = { version = "4", features = ["derive"] }
 math = { path = "../" }
-polars = { version = "0.41" }
+polars = { version = "0.43" }
 primitive = { workspace = true }
 strict-num = { workspace = true }
+
+[[bin]]
+name = "math"
+path = "src/main.rs"

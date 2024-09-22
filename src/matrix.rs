@@ -38,7 +38,7 @@ pub type VecMatrix<F> = MatrixBuf<Vec<F>, F>;
 #[derive(Debug, Clone)]
 pub struct MatrixBuf<T, F> {
     size: Size,
-    data: T,
+    buf: T,
     float: PhantomData<F>,
 }
 impl<T, F> Container2D<F> for MatrixBuf<T, F>
@@ -51,7 +51,7 @@ where
     }
     fn get(&self, index: Index) -> F {
         let index = self.index_2_to_1(index);
-        self.data.as_slice()[index]
+        self.buf.as_slice()[index]
     }
 }
 impl<T, F> Container2DMut<F> for MatrixBuf<T, F>
@@ -61,7 +61,7 @@ where
 {
     fn set(&mut self, index: Index, value: F) {
         let index = self.index_2_to_1(index);
-        self.data.as_slice_mut()[index] = value;
+        self.buf.as_slice_mut()[index] = value;
     }
 }
 impl<T, F> Seq<F> for MatrixBuf<T, F>
@@ -70,7 +70,7 @@ where
     F: Float,
 {
     fn as_slice(&self) -> &[F] {
-        self.data.as_slice()
+        self.buf.as_slice()
     }
 }
 impl<T, F> SeqMut<F> for MatrixBuf<T, F>
@@ -79,7 +79,7 @@ where
     F: Float,
 {
     fn as_slice_mut(&mut self) -> &mut [F] {
-        self.data.as_slice_mut()
+        self.buf.as_slice_mut()
     }
 }
 impl<T, F> MatrixBuf<T, F>
@@ -87,30 +87,30 @@ where
     T: Seq<F>,
     F: Float,
 {
-    pub fn new(size: Size, data: T) -> Self {
-        if data.as_slice().len() < size.volume().get() {
+    pub fn new(size: Size, buf: T) -> Self {
+        if buf.as_slice().len() < size.volume().get() {
             panic!("not enough buffer size");
         }
         Self {
             size,
-            data,
+            buf,
             float: PhantomData,
         }
     }
     pub fn into_buffer(self) -> T {
-        self.data
+        self.buf
     }
 
     pub fn transpose(&self) -> Self
     where
         T: Clone + SeqMut<F>,
     {
-        let data = self.data.clone();
+        let buf = self.buf.clone();
         let size = Size {
             rows: self.size().cols,
             cols: self.size().rows,
         };
-        let mut out = Self::new(size, data);
+        let mut out = Self::new(size, buf);
         self.transpose_in(&mut out);
         out
     }
@@ -150,8 +150,8 @@ where
     F: Float,
 {
     pub fn zero(size: Size) -> Self {
-        let data = vec![Zero::zero(); size.volume().get()];
-        MatrixBuf::new(size, data)
+        let buf = vec![Zero::zero(); size.volume().get()];
+        MatrixBuf::new(size, buf)
     }
     pub fn identity(rows: NonZeroUsize) -> Self {
         let size = Size { rows, cols: rows };
@@ -165,8 +165,8 @@ where
     F: Float,
 {
     pub fn zero(size: Size) -> Self {
-        let data = [Zero::zero(); N];
-        MatrixBuf::new(size, data)
+        let buf = [Zero::zero(); N];
+        MatrixBuf::new(size, buf)
     }
     pub fn identity(rows: NonZeroUsize) -> Self {
         let size = Size { rows, cols: rows };
@@ -178,8 +178,8 @@ where
     pub fn mul_matrix_square(&self, other: &Self) -> Self {
         assert_eq!(self.size(), other.size());
         assert_eq!(self.size().rows, self.size().cols);
-        let data = [Zero::zero(); N];
-        let mut out = Self::new(self.size(), data);
+        let buf = [Zero::zero(); N];
+        let mut out = Self::new(self.size(), buf);
         self.mul_matrix_in(other, &mut out);
         out
     }
@@ -551,12 +551,12 @@ mod tests {
 
     #[test]
     fn test_cell() {
-        let data = vec![0., 1., 2., 3., 4., 5.];
+        let buf = vec![0., 1., 2., 3., 4., 5.];
         let size = Size {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = MatrixBuf::new(size, data);
+        let matrix = MatrixBuf::new(size, buf);
         assert_eq!(matrix.get(Index { row: 0, col: 0 }), 0.);
         assert_eq!(matrix.get(Index { row: 0, col: 1 }), 1.);
         assert_eq!(matrix.get(Index { row: 0, col: 2 }), 2.);
@@ -567,12 +567,12 @@ mod tests {
 
     #[test]
     fn test_add() {
-        let data = vec![0., 1., 2., 3., 4., 5.];
+        let buf = vec![0., 1., 2., 3., 4., 5.];
         let size = Size {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let mut matrix = MatrixBuf::new(size, data);
+        let mut matrix = MatrixBuf::new(size, buf);
         matrix.map_mut(|x| x + 1.);
         let expected = MatrixBuf::new(size, vec![1., 2., 3., 4., 5., 6.]);
         assert!(matrix.closes_to(&expected));
@@ -580,12 +580,12 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        let data = vec![0., 1., 2., 3., 4., 5.];
+        let buf = vec![0., 1., 2., 3., 4., 5.];
         let size = Size {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let mut matrix = MatrixBuf::new(size, data);
+        let mut matrix = MatrixBuf::new(size, buf);
         matrix.map_mut(|x| x * 2.);
         let expected = MatrixBuf::new(size, vec![0., 2., 4., 6., 8., 10.]);
         assert!(matrix.closes_to(&expected));
@@ -593,12 +593,12 @@ mod tests {
 
     #[test]
     fn test_transpose() {
-        let data = vec![0., 1., 2., 3., 4., 5.];
+        let buf = vec![0., 1., 2., 3., 4., 5.];
         let size = Size {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = MatrixBuf::new(size, data);
+        let matrix = MatrixBuf::new(size, buf);
         let matrix = matrix.transpose();
         let size = Size {
             rows: NonZeroUsize::new(3).unwrap(),
@@ -616,15 +616,15 @@ mod tests {
 
     #[test]
     fn test_determinant() {
-        let data = vec![3., 8., 4., 6.];
+        let buf = vec![3., 8., 4., 6.];
         let size = Size {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let matrix = MatrixBuf::new(size, data);
+        let matrix = MatrixBuf::new(size, buf);
         assert_eq!(matrix.determinant(), -14.);
 
-        let data = vec![
+        let buf = vec![
             6., 1., 1., //
             4., -2., 5., //
             2., 8., 7., //
@@ -633,13 +633,13 @@ mod tests {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = MatrixBuf::new(size, data);
+        let matrix = MatrixBuf::new(size, buf);
         assert_eq!(matrix.determinant(), -306.);
     }
 
     #[test]
     fn test_inverse() {
-        let data = vec![
+        let buf = vec![
             3., 0., 2., //
             2., 0., -2., //
             0., 1., 1., //
@@ -648,7 +648,7 @@ mod tests {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let matrix = MatrixBuf::new(size, data);
+        let matrix = MatrixBuf::new(size, buf);
         let inverse = matrix.inverse();
         let expected = MatrixBuf::new(
             size,
@@ -660,7 +660,7 @@ mod tests {
         );
         assert!(inverse.closes_to(&expected));
 
-        let data = vec![
+        let buf = vec![
             2.0, 1.0, //
             1.0, 1.0, //
         ];
@@ -668,7 +668,7 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let matrix = MatrixBuf::new(size, data);
+        let matrix = MatrixBuf::new(size, buf);
         let inverse = matrix.inverse();
         let expected = MatrixBuf::new(
             size,
@@ -682,7 +682,7 @@ mod tests {
 
     #[test]
     fn test_mul_matrix() {
-        let data = vec![
+        let buf = vec![
             1., 2., 3., //
             4., 5., 6., //
         ];
@@ -690,9 +690,9 @@ mod tests {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
-        let a = MatrixBuf::new(size, data);
+        let a = MatrixBuf::new(size, buf);
 
-        let data = vec![
+        let buf = vec![
             7., 8., //
             9., 10., //
             11., 12., //
@@ -701,7 +701,7 @@ mod tests {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
-        let b = MatrixBuf::new(size, data);
+        let b = MatrixBuf::new(size, buf);
 
         let matrix = a.mul_matrix(&b);
         let size = Size {

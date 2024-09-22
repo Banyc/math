@@ -33,8 +33,8 @@ impl Size {
     }
 }
 
-pub type ArrayMatrixBuf<F, const N: usize> = MatrixBuf<[F; N], F>;
-pub type VecMatrixBuf<F> = MatrixBuf<Vec<F>, F>;
+pub type ArrayMatrix<F, const N: usize> = MatrixBuf<[F; N], F>;
+pub type VecMatrix<F> = MatrixBuf<Vec<F>, F>;
 #[derive(Debug, Clone)]
 pub struct MatrixBuf<T, F> {
     size: Size,
@@ -117,13 +117,13 @@ where
     pub fn determinant(&self) -> F {
         self.full_partial().determinant()
     }
-    pub fn inverse(&self) -> VecMatrixBuf<F> {
+    pub fn inverse(&self) -> VecMatrix<F> {
         self.full_partial().inverse()
     }
-    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrix<F> {
         self.full_partial().mul_matrix(other)
     }
-    pub fn submatrix(&self, excluded_rows: &[usize], excluded_cols: &[usize]) -> VecMatrixBuf<F> {
+    pub fn submatrix(&self, excluded_rows: &[usize], excluded_cols: &[usize]) -> VecMatrix<F> {
         self.full_partial().submatrix(excluded_rows, excluded_cols)
     }
 
@@ -145,7 +145,7 @@ where
         index.to_1(self.size().cols)
     }
 }
-impl<F> VecMatrixBuf<F>
+impl<F> VecMatrix<F>
 where
     F: Float,
 {
@@ -160,7 +160,7 @@ where
         matrix
     }
 }
-impl<const N: usize, F> ArrayMatrixBuf<F, N>
+impl<const N: usize, F> ArrayMatrix<F, N>
 where
     F: Float,
 {
@@ -247,24 +247,24 @@ where
     T: Seq<F>,
     F: Float,
 {
-    pub fn transpose(&self) -> VecMatrixBuf<F> {
+    pub fn transpose(&self) -> VecMatrix<F> {
         let size = Size {
             rows: self.size().cols,
             cols: self.size().rows,
         };
-        let mut matrix = VecMatrixBuf::<F>::zero(size);
+        let mut matrix = VecMatrix::<F>::zero(size);
         self.transpose_in(&mut matrix);
         matrix
     }
 
-    pub fn inverse(&self) -> VecMatrixBuf<F> {
-        let mut matrix_of_cofactors = VecMatrixBuf::<F>::zero(self.matrix_of_cofactors_size());
-        let mut out = VecMatrixBuf::<F>::zero(self.inverse_size());
+    pub fn inverse(&self) -> VecMatrix<F> {
+        let mut matrix_of_cofactors = VecMatrix::<F>::zero(self.matrix_of_cofactors_size());
+        let mut out = VecMatrix::<F>::zero(self.inverse_size());
         self.inverse_in(&mut matrix_of_cofactors, &mut out);
         out
     }
 
-    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrixBuf<F> {
+    pub fn mul_matrix(&self, other: &impl Container2D<F>) -> VecMatrix<F> {
         if self.size().cols != other.size().rows {
             panic!("unmatched matrix shapes for mul");
         }
@@ -272,21 +272,21 @@ where
             rows: self.size().rows,
             cols: other.size().cols,
         };
-        let mut matrix = VecMatrixBuf::<F>::zero(size);
+        let mut matrix = VecMatrix::<F>::zero(size);
         self.mul_matrix_in(other, &mut matrix);
         matrix
     }
 
-    pub fn submatrix(&self, excluded_rows: &[usize], excluded_cols: &[usize]) -> VecMatrixBuf<F> {
+    pub fn submatrix(&self, excluded_rows: &[usize], excluded_cols: &[usize]) -> VecMatrix<F> {
         let mut out =
-            VecMatrixBuf::<F>::zero(self.submatrix_size(excluded_rows.len(), excluded_cols.len()));
+            VecMatrix::<F>::zero(self.submatrix_size(excluded_rows.len(), excluded_cols.len()));
         self.submatrix_in(excluded_rows, excluded_cols, &mut out);
         out
     }
 
-    pub fn collect(&self) -> VecMatrixBuf<F> {
-        let mut out = VecMatrixBuf::zero(self.size());
-        out.zip_mut(self, |_, x| x);
+    pub fn collect(&self) -> VecMatrix<F> {
+        let mut out = VecMatrix::zero(self.size());
+        out.zip_mut_with(self, |_, x| x);
         out
     }
 }
@@ -302,7 +302,7 @@ pub trait Matrix<T>: Container2D<T>
 where
     T: Float,
 {
-    fn for_each_mut(&mut self, op: impl Fn(T) -> T)
+    fn map_mut(&mut self, op: impl Fn(T) -> T)
     where
         Self: Container2DMut<T>,
     {
@@ -315,7 +315,7 @@ where
             }
         }
     }
-    fn zip_mut(&mut self, other: &impl Container2D<T>, op: impl Fn(T, T) -> T)
+    fn zip_mut_with(&mut self, other: &impl Container2D<T>, op: impl Fn(T, T) -> T)
     where
         Self: Container2DMut<T>,
     {
@@ -459,7 +459,7 @@ where
                 - self.get(Index { row: 0, col: 1 }) * self.get(Index { row: 1, col: 0 });
         }
 
-        let mut matrix = VecMatrixBuf::<T>::zero(self.submatrix_size(1, 1));
+        let mut matrix = VecMatrix::<T>::zero(self.submatrix_size(1, 1));
         let mut sum = Zero::zero();
         let mut alt_sign = One::one();
         for col in 0..self.size().cols.get() {
@@ -535,7 +535,7 @@ where
     {
         let det = self.determinant();
         self.adjugate_in(matrix_of_cofactors, out);
-        out.for_each_mut(|x| x / det);
+        out.map_mut(|x| x / det);
     }
 }
 impl<T, F> Matrix<F> for T
@@ -573,7 +573,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.for_each_mut(|x| x + 1.);
+        matrix.map_mut(|x| x + 1.);
         let expected = MatrixBuf::new(size, vec![1., 2., 3., 4., 5., 6.]);
         assert!(matrix.closes_to(&expected));
     }
@@ -586,7 +586,7 @@ mod tests {
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let mut matrix = MatrixBuf::new(size, data);
-        matrix.for_each_mut(|x| x * 2.);
+        matrix.map_mut(|x| x * 2.);
         let expected = MatrixBuf::new(size, vec![0., 2., 4., 6., 8., 10.]);
         assert!(matrix.closes_to(&expected));
     }

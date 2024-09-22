@@ -5,7 +5,7 @@ use strict_num::{FiniteF64, NormalizedF64};
 use thiserror::Error;
 
 use crate::{
-    matrix::{Container2D, Index, MatrixBuf, Size, VecMatrixBuf},
+    matrix::{Container2D, Index, MatrixBuf, Size, VecMatrix},
     statistics::variance::VarianceExt,
     transformer::Estimate,
 };
@@ -98,7 +98,7 @@ pub enum ExamplesError {
 }
 
 #[allow(non_snake_case)]
-fn XTX_inv<V>(examples: impl Iterator<Item = V> + Clone) -> Result<VecMatrixBuf<f64>, ExamplesError>
+fn XTX_inv<V>(examples: impl Iterator<Item = V> + Clone) -> Result<VecMatrix<f64>, ExamplesError>
 where
     V: Sample,
 {

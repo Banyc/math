@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 
+use num_traits::Float;
 use strict_num::{FiniteF64, NormalizedF64};
 
 use crate::{
@@ -9,45 +10,41 @@ use crate::{
 
 pub use minimal::*;
 mod minimal {
-    use strict_num::FiniteF64;
-
     #[derive(Debug, Clone, Copy)]
-    pub struct Vector<const N: usize> {
-        dims: [FiniteF64; N],
+    pub struct Vector<F, const N: usize> {
+        dims: [F; N],
     }
-    impl<const N: usize> Vector<N> {
+    impl<F, const N: usize> Vector<F, N> {
         #[must_use]
-        pub fn new(dims: [FiniteF64; N]) -> Self {
+        pub fn new(dims: [F; N]) -> Self {
             Self { dims }
         }
         #[must_use]
-        pub fn dims(&self) -> &[FiniteF64; N] {
+        pub fn dims(&self) -> &[F; N] {
             &self.dims
         }
         #[must_use]
-        pub fn dims_mut(&mut self) -> &mut [FiniteF64; N] {
+        pub fn dims_mut(&mut self) -> &mut [F; N] {
             &mut self.dims
         }
         #[must_use]
-        pub fn zip_with(
-            &self,
-            other: &Self,
-            op: impl Fn(FiniteF64, FiniteF64) -> FiniteF64,
-        ) -> Self {
+        pub fn zip_with(&self, other: &Self, op: impl Fn(&F, &F) -> F) -> Self
+        where
+            F: core::fmt::Debug,
+        {
             let dims = self
                 .dims
                 .iter()
-                .copied()
-                .zip(other.dims.iter().copied())
+                .zip(other.dims.iter())
                 .map(|(a, b)| op(a, b))
-                .collect::<Vec<FiniteF64>>();
+                .collect::<Vec<F>>();
             let dims = dims.try_into().unwrap();
             Self { dims }
         }
     }
 }
 
-impl<const N: usize> Vector<N> {
+impl<const N: usize> Vector<FiniteF64, N> {
     #[must_use]
     pub fn add(&self, other: &Self) -> Self {
         self.zip_with(other, |a, b| FiniteF64::new(a.get() + b.get()).unwrap())
@@ -131,7 +128,7 @@ impl<const N: usize> Vector<N> {
         b
     }
 }
-impl Vector<2> {
+impl Vector<FiniteF64, 2> {
     #[must_use]
     pub fn heading_angle_2d(&self) -> f64 {
         self.heading_angle(0, 1)
@@ -140,7 +137,7 @@ impl Vector<2> {
         self.rotate(0, 1, angle)
     }
 }
-impl Vector<3> {
+impl Vector<FiniteF64, 3> {
     /// The cross product is only defined in 3D space and takes two non-parallel vectors as input and produces a third vector that is orthogonal to both the input vectors.
     /// - ref: <https://learnopengl.com/Getting-started/Transformations>
     #[must_use]
@@ -165,20 +162,25 @@ impl Vector<3> {
         Self::new(dims)
     }
 }
-impl<const N: usize> From<Vector<N>> for matrix::ArrayMatrixBuf<f64, N> {
-    fn from(value: Vector<N>) -> Self {
+impl<F, const N: usize> From<Vector<F, N>> for matrix::ArrayMatrixBuf<F, N>
+where
+    F: Float,
+{
+    fn from(value: Vector<F, N>) -> Self {
         let size = matrix::Size {
             rows: NonZeroUsize::new(N).unwrap(),
             cols: NonZeroUsize::new(1).unwrap(),
         };
-        let data = value.dims().map(|x| x.get());
-        matrix::ArrayMatrixBuf::new(size, data)
+        matrix::ArrayMatrixBuf::new(size, *value.dims())
     }
 }
-impl<const N: usize> Vector<N> {
+impl<F, const N: usize> Vector<F, N>
+where
+    F: Float,
+{
     pub fn try_from_matrix<M>(matrix: M) -> Option<Self>
     where
-        M: Container2D<f64>,
+        M: Container2D<F>,
     {
         let size = matrix::Size {
             rows: NonZeroUsize::new(N).unwrap(),
@@ -187,11 +189,11 @@ impl<const N: usize> Vector<N> {
         if matrix.size() != size {
             return None;
         }
-        let mut dims = [FiniteF64::new(0.).unwrap(); N];
+        let mut dims = [F::zero(); N];
         for (i, row) in dims.iter_mut().enumerate() {
             let index = matrix::Index { row: i, col: 0 };
             let value = matrix.get(index);
-            *row = FiniteF64::new(value).unwrap();
+            *row = value;
         }
         Some(Self::new(dims))
     }

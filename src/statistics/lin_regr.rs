@@ -1,7 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use primitive::iter::AssertIteratorItemExt;
-use strict_num::{FiniteF64, NormalizedF64};
+use strict_num::FiniteF64;
 use thiserror::Error;
 
 use crate::{
@@ -24,7 +24,7 @@ where
     V: Sample,
 {
     type Err = ExamplesError;
-    type Output = LinearRegression;
+    type Output = LinearRegressionBuf;
 
     #[allow(non_snake_case)]
     fn fit(&self, examples: impl Iterator<Item = V> + Clone) -> Result<Self::Output, Self::Err>
@@ -67,7 +67,7 @@ where
             let slope = b.get(Index { row, col: 0 });
             slopes.push(slope);
         }
-        Ok(LinearRegression::new(slopes))
+        Ok(LinearRegressionBuf::new(slopes))
     }
 }
 
@@ -160,7 +160,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct LinearRegression {
+pub struct LinearRegressionBuf {
     /// ```math
     /// (b_0, b_1, ..., b_k)
     /// ```
@@ -168,13 +168,14 @@ pub struct LinearRegression {
     /// - $k$: the number of predictor variables
     slopes: Vec<f64>,
 }
-impl LinearRegression {
+impl LinearRegressionBuf {
     pub fn new(slopes: Vec<f64>) -> Self {
         assert!(1 < slopes.len());
         Self { slopes }
     }
-
-    pub fn predict(
+}
+impl LinearRegression for LinearRegressionBuf {
+    fn predict(
         &self,
         predictors: impl Iterator<Item = f64> + Clone,
     ) -> Result<f64, LinearRegressionError> {
@@ -189,10 +190,17 @@ impl LinearRegression {
 
         Ok(sum)
     }
-
-    pub fn slopes(&self) -> &Vec<f64> {
+    fn slopes(&self) -> &[f64] {
         &self.slopes
     }
+}
+
+pub trait LinearRegression {
+    fn predict(
+        &self,
+        predictors: impl Iterator<Item = f64> + Clone,
+    ) -> Result<f64, LinearRegressionError>;
+    fn slopes(&self) -> &[f64];
 }
 #[derive(Debug, Error, Clone, Copy)]
 pub enum LinearRegressionError {
@@ -200,122 +208,104 @@ pub enum LinearRegressionError {
     NumPredictorsNumSlopesMismatched,
 }
 
-pub fn adjusted_r_squared<V>(
-    model: &LinearRegression,
-    examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, EmptySequenceError>
-where
-    V: Sample,
-{
-    let n = examples.clone().count();
-    let k = model.slopes()[1..].len();
-    let adjustment = (n - 1) as f64 / (n - k - 1) as f64;
-    Ok(1. - standard_s2_res(model, examples)? * adjustment)
-}
-pub fn r_squared<V>(
-    model: &LinearRegression,
-    examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, EmptySequenceError>
-where
-    V: Sample,
-{
-    Ok(1. - standard_s2_res(model, examples)?)
-}
-fn standard_s2_res<V>(
-    model: &LinearRegression,
-    examples: impl Iterator<Item = V> + Clone,
-) -> Result<f64, EmptySequenceError>
-where
-    V: Sample,
-{
-    let responses = examples.clone().map(|example| example.response().get());
-    let s2_y = responses.clone().variance()?;
-    let residuals = residuals(model, examples.clone());
-    let s2_res = residuals.iter().copied().variance()?;
-    Ok(s2_res / s2_y)
-}
-
-fn residuals<V>(model: &LinearRegression, examples: impl Iterator<Item = V> + Clone) -> Vec<f64>
-where
-    V: Sample,
-{
-    let responses = examples.clone().map(|example| example.response().get());
-    let predicted_responses = examples
-        .clone()
-        .map(|example| {
-            model
-                .predict(example.predictors().map(|x| x.get()))
-                .unwrap()
-        })
-        .assert_item::<f64>();
-    predicted_responses
-        .zip(responses.clone())
-        .map(|(y_hat, y)| y - y_hat)
-        .collect::<Vec<f64>>()
-}
-
-/// Null hypothesis: $b_i = 0$
-///
-/// Exclude the intercept.
-#[allow(non_snake_case)]
-pub fn t_test_params<V>(
-    model: &LinearRegression,
-    examples: impl Iterator<Item = V> + Clone,
-) -> Result<TTestParams, TTestParamsError>
-where
-    V: Sample,
-{
-    let k = model.slopes()[1..].len();
-    let n = examples.clone().count();
-    let residuals = residuals(model, examples.clone());
-    let residual_standard_error: f64 = residuals.iter().copied().standard_deviation().unwrap();
-
-    let XTX_inv = XTX_inv(examples.clone()).map_err(TTestParamsError::Examples)?;
-    let mut slope_standard_errors = vec![];
-    for i in 1..=k {
-        let index = Index { row: i, col: i };
-        let value = XTX_inv.get(index);
-        let se = residual_standard_error * value.sqrt();
-        slope_standard_errors.push(se);
+pub trait LinearRegressionExt: LinearRegression {
+    fn adjusted_r_squared<V>(
+        &self,
+        examples: impl Iterator<Item = V> + Clone,
+    ) -> Result<f64, EmptySequenceError>
+    where
+        V: Sample,
+    {
+        let n = examples.clone().count();
+        let k = self.slopes()[1..].len();
+        let adjustment = (n - 1) as f64 / (n - k - 1) as f64;
+        Ok(1. - self.standard_residuals_variance(examples)? * adjustment)
     }
-    let t_values: Vec<f64> = model.slopes()[1..]
-        .iter()
-        .copied()
-        .zip(slope_standard_errors.iter().copied())
-        .map(|(b, se)| (b - 0.) / se)
-        .collect::<Vec<f64>>();
-    let df = n - k - 1;
-    let df = NonZeroUsize::new(df).ok_or(TTestParamsError::TooFewExamples)?;
-    Ok(TTestParams {
-        residual_standard_error,
-        slope_standard_errors,
-        t: t_values,
-        df,
-    })
+    fn r_squared<V>(
+        &self,
+        examples: impl Iterator<Item = V> + Clone,
+    ) -> Result<f64, EmptySequenceError>
+    where
+        V: Sample,
+    {
+        Ok(1. - self.standard_residuals_variance(examples)?)
+    }
+    fn standard_residuals_variance<V>(
+        &self,
+        examples: impl Iterator<Item = V> + Clone,
+    ) -> Result<f64, EmptySequenceError>
+    where
+        V: Sample,
+    {
+        let responses = examples.clone().map(|example| example.response().get());
+        let s2_y = responses.clone().variance()?;
+        let residuals = self.residuals(examples.clone());
+        let s2_res = residuals.iter().copied().variance()?;
+        Ok(s2_res / s2_y)
+    }
+    fn residuals<V>(&self, examples: impl Iterator<Item = V> + Clone) -> Vec<f64>
+    where
+        V: Sample,
+    {
+        let responses = examples.clone().map(|example| example.response().get());
+        let predicted_responses = examples
+            .clone()
+            .map(|example| self.predict(example.predictors().map(|x| x.get())).unwrap())
+            .assert_item::<f64>();
+        predicted_responses
+            .zip(responses.clone())
+            .map(|(y_hat, y)| y - y_hat)
+            .collect::<Vec<f64>>()
+    }
+
+    /// Null hypothesis: $b_i = 0$
+    ///
+    /// Exclude the intercept.
+    #[allow(non_snake_case)]
+    fn t_test_params<V>(
+        &self,
+        examples: impl Iterator<Item = V> + Clone,
+    ) -> Result<TTestParams, TTestParamsError>
+    where
+        V: Sample,
+    {
+        let k = self.slopes()[1..].len();
+        let n = examples.clone().count();
+        let residuals = self.residuals(examples.clone());
+        let residual_standard_error: f64 = residuals.iter().copied().standard_deviation().unwrap();
+
+        let XTX_inv = XTX_inv(examples.clone()).map_err(TTestParamsError::Examples)?;
+        let mut slope_standard_errors = vec![];
+        for i in 1..=k {
+            let index = Index { row: i, col: i };
+            let value = XTX_inv.get(index);
+            let se = residual_standard_error * value.sqrt();
+            slope_standard_errors.push(se);
+        }
+        let t_values: Vec<f64> = self.slopes()[1..]
+            .iter()
+            .copied()
+            .zip(slope_standard_errors.iter().copied())
+            .map(|(b, se)| (b - 0.) / se)
+            .collect::<Vec<f64>>();
+        let df = n - k - 1;
+        let df = NonZeroUsize::new(df).ok_or(TTestParamsError::TooFewExamples)?;
+        Ok(TTestParams {
+            residual_standard_error,
+            slope_standard_errors,
+            t: t_values,
+            df,
+        })
+    }
 }
+impl<T> LinearRegressionExt for T where T: LinearRegression {}
+
 #[derive(Debug, Clone)]
 pub struct TTestParams {
     pub residual_standard_error: f64,
     pub slope_standard_errors: Vec<f64>,
     pub t: Vec<f64>,
     pub df: NonZeroUsize,
-}
-impl TTestParams {
-    pub fn two_sided_p_values(&self) -> Vec<NormalizedF64> {
-        let t = self
-            .t
-            .iter()
-            .copied()
-            .map(FiniteF64::new)
-            .collect::<Option<Vec<FiniteF64>>>()
-            .unwrap();
-        t.iter()
-            .copied()
-            .map(|t| {
-                statistical_inference::distributions::t::T_SCORE_TABLE.p_value_two_sided(self.df, t)
-            })
-            .collect::<Vec<NormalizedF64>>()
-    }
 }
 #[derive(Debug, Error, Clone, Copy)]
 pub enum TTestParamsError {
@@ -364,7 +354,7 @@ mod tests {
         assert!(model.slopes[0].closes_to(0.));
         assert!(model.slopes[1].closes_to(1.));
 
-        let r_squared = r_squared(&model, samples.iter()).unwrap();
+        let r_squared = model.r_squared(samples.iter()).unwrap();
         println!("R-squared: {r_squared}");
     }
 
@@ -394,16 +384,16 @@ mod tests {
         assert!(f64::abs(model.slopes[0] - 2.034) < 0.001);
         assert!(f64::abs(model.slopes[1] - 0.5615) < 0.001);
 
-        let r_squared = r_squared(&model, samples.iter()).unwrap();
+        let r_squared = model.r_squared(samples.iter()).unwrap();
         println!("R-squared: {r_squared}");
-        let adjusted_r_squared = adjusted_r_squared(&model, samples.iter()).unwrap();
+        let adjusted_r_squared = model.adjusted_r_squared(samples.iter()).unwrap();
         println!("adjusted R-squared: {adjusted_r_squared}");
-        let t_test_params = t_test_params(&model, samples.iter()).unwrap();
+        let t_test_params = model.t_test_params(samples.iter()).unwrap();
         println!("{t_test_params:?}");
-        println!(
-            "two-sided p values: {:?}",
-            t_test_params.two_sided_p_values()
-        );
+        // println!(
+        //     "two-sided p values: {:?}",
+        //     t_test_params.two_sided_p_values()
+        // );
     }
 
     /// ref: <https://ecampusontario.pressbooks.pub/introstats/chapter/13-3-standard-error-of-the-estimate/>
@@ -455,16 +445,16 @@ mod tests {
         assert!(f64::abs(model.slopes[2] - 0.0046) < 0.001);
         assert!(f64::abs(model.slopes[3] - 0.0233) < 0.001);
 
-        let r_squared = r_squared(&model, samples.iter()).unwrap();
+        let r_squared = model.r_squared(samples.iter()).unwrap();
         assert!(r_squared.closes_to(0.506629665));
-        let adjusted_r_squared = adjusted_r_squared(&model, samples.iter()).unwrap();
+        let adjusted_r_squared = model.adjusted_r_squared(samples.iter()).unwrap();
         assert!(adjusted_r_squared.closes_to(0.436148189));
-        let t_test_params = t_test_params(&model, samples.iter()).unwrap();
+        let t_test_params = model.t_test_params(samples.iter()).unwrap();
         assert_eq!(t_test_params.df.get(), 21);
         println!("{t_test_params:?}");
-        println!(
-            "two-sided p values: {:?}",
-            t_test_params.two_sided_p_values()
-        );
+        // println!(
+        //     "two-sided p values: {:?}",
+        //     t_test_params.two_sided_p_values()
+        // );
     }
 }

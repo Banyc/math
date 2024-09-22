@@ -23,7 +23,6 @@ impl Estimate<f64> for MeanImputationEstimator {
 pub struct MeanImputer {
     mean: f64,
 }
-
 impl Transform<f64> for MeanImputer {
     type Err = Infallible;
 

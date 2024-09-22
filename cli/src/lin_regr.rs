@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use banyc_polars_util::read_df_file;
 use clap::Args;
 use math::{
-    statistics::lin_regr::{adjusted_r_squared, t_test_params, LinearRegressionEstimator, Sample},
+    statistics::lin_regr::{
+        LinearRegression, LinearRegressionEstimator, LinearRegressionExt, Sample, TTestParams,
+    },
     transformer::Estimate,
 };
 use polars::prelude::*;
 use primitive::iter::{AssertIteratorItemExt, VecZip};
-use strict_num::FiniteF64;
+use strict_num::{FiniteF64, NormalizedF64};
 
 #[derive(Debug, Clone, Args)]
 pub struct LinRegrArgs {
@@ -62,11 +64,11 @@ impl LinRegrArgs {
         let estimator = LinearRegressionEstimator;
         let model = estimator.fit(examples.iter())?;
 
-        let adjusted_r_squared = adjusted_r_squared(&model, examples.iter())?;
+        let adjusted_r_squared = model.adjusted_r_squared(examples.iter())?;
         println!("adjusted R-squared: {adjusted_r_squared}");
 
-        let t_test_params = t_test_params(&model, examples.iter())?;
-        let p_values = t_test_params.two_sided_p_values();
+        let t_test_params = model.t_test_params(examples.iter())?;
+        let p_values = two_sided_p_values(&t_test_params);
         let p_values = p_values.iter().map(|p| p.get()).collect::<Vec<f64>>();
 
         println!("residual SE: {}", t_test_params.residual_standard_error);
@@ -89,8 +91,23 @@ impl Sample for &Example {
     fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone {
         self.x.iter().copied()
     }
-
     fn response(&self) -> FiniteF64 {
         self.y
     }
+}
+
+fn two_sided_p_values(params: &TTestParams) -> Vec<NormalizedF64> {
+    let t = params
+        .t
+        .iter()
+        .copied()
+        .map(FiniteF64::new)
+        .collect::<Option<Vec<FiniteF64>>>()
+        .unwrap();
+    t.iter()
+        .copied()
+        .map(|t| {
+            statistical_inference::distributions::t::T_SCORE_TABLE.p_value_two_sided(params.df, t)
+        })
+        .collect::<Vec<NormalizedF64>>()
 }

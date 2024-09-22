@@ -50,13 +50,47 @@ where
     }
 }
 
+pub trait Vector<F>: Seq<F>
+where
+    F: Float + core::fmt::Debug + core::iter::Sum,
+{
+    #[must_use]
+    fn mag(&self) -> F {
+        let sum = self.as_slice().iter().map(|x| x.powi(2)).sum::<F>();
+        sum.sqrt()
+    }
+    #[must_use]
+    fn heading_angle(&self, adjacent_axis: usize, opposite_axis: usize) -> F {
+        let adj = self.as_slice()[adjacent_axis];
+        let opp = self.as_slice()[opposite_axis];
+        F::atan2(opp, adj)
+    }
+    #[must_use]
+    fn heading_angle_2d(&self) -> F {
+        assert_eq!(self.as_slice().len(), 2);
+        self.heading_angle(0, 1)
+    }
+    /// The cross product is only defined in 3D space and takes two non-parallel vectors as input and produces a third vector that is orthogonal to both the input vectors.
+    /// - ref: <https://learnopengl.com/Getting-started/Transformations>
+    #[must_use]
+    fn cross(&self, other: &impl Seq<F>) -> [F; 3] {
+        assert_eq!(self.as_slice().len(), 3);
+        assert_eq!(self.as_slice().len(), other.as_slice().len());
+        [
+            self.as_slice()[1] * other.as_slice()[2] - self.as_slice()[2] * other.as_slice()[1],
+            self.as_slice()[2] * other.as_slice()[0] - self.as_slice()[0] * other.as_slice()[2],
+            self.as_slice()[0] * other.as_slice()[1] - self.as_slice()[1] * other.as_slice()[0],
+        ]
+    }
+}
 impl<T, F> Vector<F> for T
 where
-    T: SeqMut<F>,
+    T: Seq<F>,
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
 }
-pub trait Vector<F>: SeqMut<F>
+
+pub trait VectorMut<F>: SeqMut<F> + Vector<F>
 where
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
@@ -91,11 +125,6 @@ where
     fn div(&mut self, other: F) {
         self.mul(F::one() / other);
     }
-    #[must_use]
-    fn mag(&self) -> F {
-        let sum = self.as_slice().iter().map(|x| x.powi(2)).sum::<F>();
-        sum.sqrt()
-    }
     fn normalize(&mut self) {
         self.div(self.mag());
     }
@@ -115,12 +144,6 @@ where
     fn lerp(&mut self, other: &impl Seq<F>, t: NormalizedF64) {
         self.zip_mut_with(other, |&a, &b| lerp(&(a..=b), t.into()));
     }
-    #[must_use]
-    fn heading_angle(&self, adjacent_axis: usize, opposite_axis: usize) -> F {
-        let adj = self.as_slice()[adjacent_axis];
-        let opp = self.as_slice()[opposite_axis];
-        F::atan2(opp, adj)
-    }
     fn rotate(&mut self, adjacent_axis: usize, opposite_axis: usize, angle: F) {
         let cos = angle.cos();
         let sin = angle.sin();
@@ -138,11 +161,15 @@ where
         let mul_mag = mag * other.mag();
         F::acos(dot / mul_mag)
     }
+    fn rotate_2d(&mut self, angle: F) {
+        assert_eq!(self.as_slice().len(), 2);
+        self.rotate(0, 1, angle)
+    }
     #[must_use]
     fn normal_point<E>(&self, start: &impl Vector<F>, end: &E) -> E
     where
         Self: Clone,
-        E: Vector<F> + Clone,
+        E: VectorMut<F> + Clone,
     {
         assert_eq!(self.as_slice().len(), start.as_slice().len());
         assert_eq!(start.as_slice().len(), end.as_slice().len());
@@ -157,27 +184,12 @@ where
         b.set_mag(d);
         b
     }
-    #[must_use]
-    fn heading_angle_2d(&self) -> F {
-        assert_eq!(self.as_slice().len(), 2);
-        self.heading_angle(0, 1)
-    }
-    fn rotate_2d(&mut self, angle: F) {
-        assert_eq!(self.as_slice().len(), 2);
-        self.rotate(0, 1, angle)
-    }
-    /// The cross product is only defined in 3D space and takes two non-parallel vectors as input and produces a third vector that is orthogonal to both the input vectors.
-    /// - ref: <https://learnopengl.com/Getting-started/Transformations>
-    #[must_use]
-    fn cross(&self, other: &impl Seq<F>) -> [F; 3] {
-        assert_eq!(self.as_slice().len(), 3);
-        assert_eq!(self.as_slice().len(), other.as_slice().len());
-        [
-            self.as_slice()[1] * other.as_slice()[2] - self.as_slice()[2] * other.as_slice()[1],
-            self.as_slice()[2] * other.as_slice()[0] - self.as_slice()[0] * other.as_slice()[2],
-            self.as_slice()[0] * other.as_slice()[1] - self.as_slice()[1] * other.as_slice()[0],
-        ]
-    }
+}
+impl<T, F> VectorMut<F> for T
+where
+    T: SeqMut<F>,
+    F: Float + core::fmt::Debug + core::iter::Sum,
+{
 }
 impl<T, F> From<VectorBuf<T, F>> for matrix::MatrixBuf<T, F>
 where

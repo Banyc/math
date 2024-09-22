@@ -1,11 +1,14 @@
+use num_traits::Float;
 use strict_num::NormalizedF64;
 
 use crate::prob::Probability;
 
 /// Ref: <https://en.wikipedia.org/wiki/Linear_interpolation>
 #[must_use]
-pub fn lerp(v: &std::ops::RangeInclusive<f64>, t: Probability) -> f64 {
-    t.complementary().get() * v.start() + t.get() * v.end()
+pub fn lerp<F: Float>(v: &std::ops::RangeInclusive<F>, t: Probability) -> F {
+    let t_compl = F::from(t.complementary().get()).unwrap();
+    let t = F::from(t.get()).unwrap();
+    t_compl * *v.start() + t * *v.end()
 }
 
 #[must_use]

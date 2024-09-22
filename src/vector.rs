@@ -54,6 +54,15 @@ pub trait Vector<F>: Seq<F>
 where
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
+    fn closes_to(&self, other: &impl Seq<F>) -> bool {
+        use primitive::float::FloatExt;
+        assert_eq!(self.as_slice().len(), other.as_slice().len());
+        self.as_slice()
+            .iter()
+            .copied()
+            .zip(other.as_slice().iter().copied())
+            .all(|(a, b)| a.closes_to(b))
+    }
     #[must_use]
     fn mag(&self) -> F {
         let sum = self.as_slice().iter().map(|x| x.powi(2)).sum::<F>();
@@ -273,7 +282,6 @@ mod tests {
     fn test_rotation() {
         let mut v = [1., 0.5];
         v.rotate_2d(PI / 2.);
-        assert!(v.as_slice()[0].closes_to(-0.5));
-        assert!(v.as_slice()[1].closes_to(1.));
+        assert!(v.closes_to(&[-0.5, 1.]));
     }
 }

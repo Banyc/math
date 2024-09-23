@@ -91,6 +91,17 @@ where
             self.as_slice()[0] * other.as_slice()[1] - self.as_slice()[1] * other.as_slice()[0],
         ]
     }
+    fn into_matrix(self) -> Option<matrix::MatrixBuf<Self, F>>
+    where
+        Self: Sized,
+    {
+        let rows = NonZeroUsize::new(self.as_slice().len())?;
+        let size = matrix::Size {
+            rows,
+            cols: NonZeroUsize::new(1).unwrap(),
+        };
+        Some(matrix::MatrixBuf::new(size, self))
+    }
 }
 impl<T, F> Vector<F> for T
 where
@@ -213,40 +224,33 @@ where
         matrix::MatrixBuf::new(size, value.into_buffer())
     }
 }
-impl<T, F> From<T> for matrix::MatrixBuf<T, F>
+impl<T, F> TryFrom<matrix::MatrixBuf<T, F>> for VectorBuf<T, F>
 where
     T: Seq<F>,
     F: Float,
 {
-    fn from(value: T) -> Self {
-        let size = matrix::Size {
-            rows: NonZeroUsize::new(value.as_slice().len()).unwrap(),
-            cols: NonZeroUsize::new(1).unwrap(),
-        };
-        matrix::MatrixBuf::new(size, value)
-    }
-}
-impl<T, F> From<matrix::MatrixBuf<T, F>> for VectorBuf<T, F>
-where
-    T: Seq<F>,
-    F: Float,
-{
-    fn from(value: matrix::MatrixBuf<T, F>) -> Self {
-        assert_eq!(value.size().cols.get(), 1);
+    type Error = &'static str;
+    fn try_from(value: matrix::MatrixBuf<T, F>) -> Result<Self, Self::Error> {
+        if value.size().cols.get() != 1 {
+            return Err("multiple columns");
+        }
         let size = value.size().rows;
-        Self::new(size, value.into_buffer())
+        Ok(Self::new(size, value.into_buffer()))
     }
 }
-impl<F, const N: usize> From<matrix::ArrayMatrix<F, N>> for [F; N]
+impl<F, const N: usize> TryFrom<matrix::ArrayMatrix<F, N>> for [F; N]
 where
     F: Float,
 {
-    fn from(value: matrix::ArrayMatrix<F, N>) -> Self {
-        assert_eq!(value.size().cols.get(), 1);
+    type Error = &'static str;
+    fn try_from(value: matrix::ArrayMatrix<F, N>) -> Result<Self, Self::Error> {
+        if value.size().cols.get() != 1 {
+            return Err("multiple columns");
+        }
         let size = value.size().rows;
         let buf = value.into_buffer();
         assert_eq!(size.get(), buf.len());
-        buf
+        Ok(buf)
     }
 }
 

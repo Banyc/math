@@ -36,18 +36,18 @@ impl PartialEq for Probability {
 }
 impl Eq for Probability {}
 impl Ord for Probability {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.0
             .partial_cmp(&other.0)
             .expect("`Probability` is impossible to be NaN")
     }
 }
 impl PartialOrd for Probability {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
-impl std::ops::Mul for Probability {
+impl core::ops::Mul for Probability {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         Self::new(self.get() * rhs.get()).unwrap()

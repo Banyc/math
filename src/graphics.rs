@@ -5,7 +5,7 @@ use crate::prob::Probability;
 
 /// Ref: <https://en.wikipedia.org/wiki/Linear_interpolation>
 #[must_use]
-pub fn lerp<F: Float>(v: &std::ops::RangeInclusive<F>, t: Probability) -> F {
+pub fn lerp<F: Float>(v: &core::ops::RangeInclusive<F>, t: Probability) -> F {
     let t_compl = F::from(t.complementary().get()).unwrap();
     let t = F::from(t.get()).unwrap();
     t_compl * *v.start() + t * *v.end()
@@ -35,7 +35,7 @@ pub fn brew_colors(n: usize) -> Vec<(u8, u8, u8)> {
 
     let mut colors = Vec::with_capacity(n);
 
-    const RANGE: std::ops::Range<f64> = 25.0..385.0;
+    const RANGE: core::ops::Range<f64> = 25.0..385.0;
     const DIFF: f64 = RANGE.end - RANGE.start;
     let step = DIFF / n as f64;
 

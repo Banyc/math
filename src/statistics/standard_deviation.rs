@@ -49,9 +49,9 @@ mod tests {
 
     #[test]
     fn test_std_dev() {
-        let polarized = std::iter::repeat(f64::MIN)
+        let polarized = core::iter::repeat(f64::MIN)
             .take(1 << 5)
-            .chain(std::iter::once(f64::MAX))
+            .chain(core::iter::once(f64::MAX))
             .map(|x| FiniteF64::new(x).unwrap());
         let std_dev = polarized.standard_deviation();
         assert!(std_dev.is_err());

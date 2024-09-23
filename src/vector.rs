@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, num::NonZeroUsize};
+use core::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::Float;
 use primitive::seq::{Seq, SeqMut};
@@ -252,7 +252,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::PI;
+    use core::f64::consts::PI;
 
     use primitive::float::FloatExt;
 

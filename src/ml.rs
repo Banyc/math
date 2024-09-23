@@ -2,7 +2,7 @@ use crate::prob::Probability;
 
 /// # Panic
 ///
-/// If `x` is [`std::f64::NAN`]
+/// If `x` is [`core::f64::NAN`]
 pub fn sigmoid(x: f64) -> Probability {
     assert!(!x.is_nan());
     // Prevent floating point underflow

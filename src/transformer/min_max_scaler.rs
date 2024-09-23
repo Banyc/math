@@ -1,4 +1,4 @@
-use std::ops::RangeInclusive;
+use core::ops::RangeInclusive;
 
 use strict_num::{FiniteF64, PositiveF64};
 use thiserror::Error;
@@ -101,7 +101,7 @@ pub struct InfiniteOrNegativeGivenRangeLengthError;
 pub struct MinMaxScaler {
     min: FiniteF64,
     max: FiniteF64,
-    range: std::ops::RangeInclusive<FiniteF64>,
+    range: core::ops::RangeInclusive<FiniteF64>,
 }
 impl Transform<f64> for MinMaxScaler {
     type Err = MinMaxScalerError;

@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, num::NonZeroUsize};
+use core::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::{Float, One, Zero};
 use primitive::{

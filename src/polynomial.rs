@@ -1,7 +1,7 @@
 use primitive::float::FloatExt;
 use thiserror::Error;
 
-use std::{fmt::Display, ops};
+use core::{fmt::Display, ops};
 
 #[derive(Debug, Error, Clone, Copy)]
 pub enum Error {
@@ -208,7 +208,7 @@ impl PartialEq<Polynomial> for Polynomial {
 }
 
 impl Display for Polynomial {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut output = String::new();
         let mut first = true;
         for (i, coeff) in self.coefficients.iter().enumerate() {

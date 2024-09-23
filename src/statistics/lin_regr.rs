@@ -1,4 +1,5 @@
-use std::{collections::HashMap, num::NonZeroUsize};
+use core::num::NonZeroUsize;
+use std::collections::HashMap;
 
 use primitive::iter::AssertIteratorItemExt;
 use strict_num::FiniteF64;

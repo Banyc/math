@@ -64,24 +64,6 @@ where
         self.buf.as_slice_mut()[index] = value;
     }
 }
-impl<T, F> Seq<F> for MatrixBuf<T, F>
-where
-    T: SeqMut<F>,
-    F: Float,
-{
-    fn as_slice(&self) -> &[F] {
-        self.buf.as_slice()
-    }
-}
-impl<T, F> SeqMut<F> for MatrixBuf<T, F>
-where
-    T: SeqMut<F>,
-    F: Float,
-{
-    fn as_slice_mut(&mut self) -> &mut [F] {
-        self.buf.as_slice_mut()
-    }
-}
 impl<T, F> MatrixBuf<T, F>
 where
     T: Seq<F>,
@@ -99,6 +81,12 @@ where
     }
     pub fn into_buffer(self) -> T {
         self.buf
+    }
+    pub fn buffer(&self) -> &T {
+        &self.buf
+    }
+    pub fn buffer_mut(&mut self) -> &mut T {
+        &mut self.buf
     }
 
     pub fn transpose(&self) -> Self
@@ -259,8 +247,9 @@ where
 
     pub fn inverse(&self) -> VecMatrix<F> {
         let mut matrix_of_cofactors = VecMatrix::<F>::zero(self.matrix_of_cofactors_size());
+        let mut submatrix = VecMatrix::<F>::zero(self.minor_size());
         let mut out = VecMatrix::<F>::zero(self.inverse_size());
-        self.inverse_in(&mut matrix_of_cofactors, &mut out);
+        self.inverse_in(&mut matrix_of_cofactors, &mut submatrix, &mut out);
         out
     }
 
@@ -477,17 +466,20 @@ where
     fn matrix_of_minors_size(&self) -> Size {
         self.size()
     }
+    fn minor_size(&self) -> Size {
+        self.submatrix_size(1, 1)
+    }
     fn matrix_of_minors_in(
         &self,
-        exclude_cross: &mut impl Container2DMut<T>,
+        minor: &mut impl Container2DMut<T>,
         out: &mut impl Container2DMut<T>,
     ) {
         assert_eq!(out.size(), self.matrix_of_minors_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
                 let index = Index { row, col };
-                self.submatrix_in(&[row], &[col], exclude_cross);
-                let det = exclude_cross.determinant();
+                self.submatrix_in(&[row], &[col], minor);
+                let det = minor.determinant();
                 out.set(index, det);
             }
         }
@@ -498,10 +490,10 @@ where
     }
     fn matrix_of_cofactors_in(
         &self,
-        exclude_cross: &mut impl Container2DMut<T>,
+        minor: &mut impl Container2DMut<T>,
         out: &mut impl Container2DMut<T>,
     ) {
-        self.matrix_of_minors_in(exclude_cross, out);
+        self.matrix_of_minors_in(minor, out);
         for row in 0..out.size().rows.get() {
             for col in 0..out.size().cols.get() {
                 let is_even = (row + col) % 2 == 0;
@@ -517,24 +509,27 @@ where
     fn adjugate_size(&self) -> Size {
         self.transpose_size()
     }
-    fn adjugate_in<O>(&self, matrix_of_cofactors: &mut impl Container2DMut<T>, out: &mut O)
-    where
-        O: Container2DMut<T> + SeqMut<T>,
-    {
-        let mut exclude_cross = MatrixBuf::new(self.submatrix_size(1, 1), out.as_slice_mut());
-        self.matrix_of_cofactors_in(&mut exclude_cross, matrix_of_cofactors);
+    fn adjugate_in(
+        &self,
+        matrix_of_cofactors: &mut impl Container2DMut<T>,
+        minor: &mut impl Container2DMut<T>,
+        out: &mut impl Container2DMut<T>,
+    ) {
+        self.matrix_of_cofactors_in(minor, matrix_of_cofactors);
         matrix_of_cofactors.transpose_in(out);
     }
 
     fn inverse_size(&self) -> Size {
         self.adjugate_size()
     }
-    fn inverse_in<O>(&self, matrix_of_cofactors: &mut impl Container2DMut<T>, out: &mut O)
-    where
-        O: Container2DMut<T> + SeqMut<T>,
-    {
+    fn inverse_in(
+        &self,
+        matrix_of_cofactors: &mut impl Container2DMut<T>,
+        minor: &mut impl Container2DMut<T>,
+        out: &mut impl Container2DMut<T>,
+    ) {
         let det = self.determinant();
-        self.adjugate_in(matrix_of_cofactors, out);
+        self.adjugate_in(matrix_of_cofactors, minor, out);
         out.map_mut(|x| x / det);
     }
 }

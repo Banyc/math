@@ -55,7 +55,7 @@ where
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
     fn closes_to(&self, other: &impl Seq<F>) -> bool {
-        use primitive::float::FloatExt;
+        use primitive::ops::float::FloatExt;
         assert_eq!(self.as_slice().len(), other.as_slice().len());
         self.as_slice()
             .iter()
@@ -258,7 +258,7 @@ where
 mod tests {
     use core::f64::consts::PI;
 
-    use primitive::float::FloatExt;
+    use primitive::ops::float::FloatExt;
 
     use super::*;
 

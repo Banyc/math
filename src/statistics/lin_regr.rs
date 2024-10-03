@@ -318,7 +318,7 @@ pub enum TTestParamsError {
 
 #[cfg(test)]
 mod tests {
-    use primitive::float::FloatExt;
+    use primitive::ops::float::FloatExt;
 
     use super::*;
 

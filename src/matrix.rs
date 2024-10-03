@@ -2,8 +2,8 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::{Float, One, Zero};
 use primitive::{
-    float::FloatExt,
     iter::Lookahead1,
+    ops::float::FloatExt,
     seq::{Seq, SeqMut},
 };
 

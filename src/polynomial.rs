@@ -1,4 +1,4 @@
-use primitive::float::FloatExt;
+use primitive::ops::float::FloatExt;
 use thiserror::Error;
 
 use core::{fmt::Display, ops};

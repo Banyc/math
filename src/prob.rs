@@ -1,4 +1,4 @@
-use primitive::float::FloatExt;
+use primitive::ops::float::FloatExt;
 use strict_num::NormalizedF64;
 
 #[derive(Debug, Clone, Copy)]

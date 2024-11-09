@@ -122,7 +122,7 @@ impl Polynomial {
     }
 }
 
-impl<'a, 'b> ops::Add<&'b Polynomial> for &'a Polynomial {
+impl<'b> ops::Add<&'b Polynomial> for &Polynomial {
     type Output = Polynomial;
 
     fn add(self, rhs: &'b Polynomial) -> Self::Output {
@@ -149,7 +149,7 @@ impl<'a, 'b> ops::Add<&'b Polynomial> for &'a Polynomial {
     }
 }
 
-impl<'a, 'b> ops::Sub<&'b Polynomial> for &'a Polynomial {
+impl<'b> ops::Sub<&'b Polynomial> for &Polynomial {
     type Output = Polynomial;
 
     fn sub(self, rhs: &'b Polynomial) -> Self::Output {
@@ -176,7 +176,7 @@ impl<'a, 'b> ops::Sub<&'b Polynomial> for &'a Polynomial {
     }
 }
 
-impl<'a, 'b> ops::Mul<&'b Polynomial> for &'a Polynomial {
+impl<'b> ops::Mul<&'b Polynomial> for &Polynomial {
     type Output = Polynomial;
 
     fn mul(self, rhs: &'b Polynomial) -> Self::Output {

@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
-banyc_polars_util = { version = "0.3" }
+banyc_polars_util = { version = "0.5" }
 clap = { version = "4", features = ["derive"] }
 math = { path = "../" }
-polars = { version = "0.43" }
+polars = { version = "0.44" }
 primitive = { workspace = true }
 statistical_inference = { workspace = true }
 strict-num = { workspace = true }

@@ -1,7 +1,7 @@
 use core::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::Float;
-use primitive::seq::{Seq, SeqMut};
+use primitive::ops::slice::{AsSlice, AsSliceMut};
 use strict_num::NormalizedF64;
 
 use crate::{
@@ -19,7 +19,7 @@ pub struct VectorBuf<T, F> {
 }
 impl<T, F> VectorBuf<T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
 {
     pub fn new(size: NonZeroUsize, buf: T) -> Self {
         assert!(size.get() <= buf.as_slice().len());
@@ -33,28 +33,28 @@ where
         self.buf
     }
 }
-impl<T, F> Seq<F> for VectorBuf<T, F>
+impl<T, F> AsSlice<F> for VectorBuf<T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
 {
     fn as_slice(&self) -> &[F] {
         &self.buf.as_slice()[..self.size.get()]
     }
 }
-impl<T, F> SeqMut<F> for VectorBuf<T, F>
+impl<T, F> AsSliceMut<F> for VectorBuf<T, F>
 where
-    T: SeqMut<F>,
+    T: AsSliceMut<F>,
 {
     fn as_slice_mut(&mut self) -> &mut [F] {
         &mut self.buf.as_slice_mut()[..self.size.get()]
     }
 }
 
-pub trait Vector<F>: Seq<F>
+pub trait Vector<F>: AsSlice<F>
 where
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
-    fn closes_to(&self, other: &impl Seq<F>) -> bool {
+    fn closes_to(&self, other: &impl AsSlice<F>) -> bool {
         use primitive::ops::float::FloatExt;
         assert_eq!(self.as_slice().len(), other.as_slice().len());
         self.as_slice()
@@ -82,7 +82,7 @@ where
     /// The cross product is only defined in 3D space and takes two non-parallel vectors as input and produces a third vector that is orthogonal to both the input vectors.
     /// - ref: <https://learnopengl.com/Getting-started/Transformations>
     #[must_use]
-    fn cross(&self, other: &impl Seq<F>) -> [F; 3] {
+    fn cross(&self, other: &impl AsSlice<F>) -> [F; 3] {
         assert_eq!(self.as_slice().len(), 3);
         assert_eq!(self.as_slice().len(), other.as_slice().len());
         [
@@ -105,18 +105,18 @@ where
 }
 impl<T, F> Vector<F> for T
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
 }
 
-pub trait VectorMut<F>: SeqMut<F> + Vector<F>
+pub trait VectorMut<F>: AsSliceMut<F> + Vector<F>
 where
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
     fn zip_mut_with<T>(&mut self, other: &T, op: impl Fn(&F, &F) -> F)
     where
-        T: Seq<F>,
+        T: AsSlice<F>,
         F: core::fmt::Debug,
     {
         assert_eq!(self.as_slice().len(), other.as_slice().len());
@@ -128,14 +128,14 @@ where
                 *a = res;
             });
     }
-    fn add(&mut self, other: &impl Seq<F>) {
+    fn add(&mut self, other: &impl AsSlice<F>) {
         self.zip_mut_with(other, |&a, &b| a + b)
     }
-    fn sub(&mut self, other: &impl Seq<F>) {
+    fn sub(&mut self, other: &impl AsSlice<F>) {
         self.zip_mut_with(other, |&a, &b| a - b)
     }
     #[must_use]
-    fn dot(&mut self, other: &impl Seq<F>) -> F {
+    fn dot(&mut self, other: &impl AsSlice<F>) -> F {
         self.zip_mut_with(other, |&a, &b| a * b);
         self.as_slice().iter().copied().sum::<F>()
     }
@@ -157,11 +157,11 @@ where
         self.set_mag(mag);
     }
     #[must_use]
-    fn dist(&mut self, other: &impl Seq<F>) -> F {
+    fn dist(&mut self, other: &impl AsSlice<F>) -> F {
         self.sub(other);
         self.mag()
     }
-    fn lerp(&mut self, other: &impl Seq<F>, t: NormalizedF64) {
+    fn lerp(&mut self, other: &impl AsSlice<F>, t: NormalizedF64) {
         self.zip_mut_with(other, |&a, &b| lerp(&(a..=b), t.into()));
     }
     fn rotate(&mut self, adjacent_axis: usize, opposite_axis: usize, angle: F) {
@@ -207,13 +207,13 @@ where
 }
 impl<T, F> VectorMut<F> for T
 where
-    T: SeqMut<F>,
+    T: AsSliceMut<F>,
     F: Float + core::fmt::Debug + core::iter::Sum,
 {
 }
 impl<T, F> From<VectorBuf<T, F>> for matrix::MatrixBuf<T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     fn from(value: VectorBuf<T, F>) -> Self {
@@ -226,7 +226,7 @@ where
 }
 impl<T, F> TryFrom<matrix::MatrixBuf<T, F>> for VectorBuf<T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     type Error = &'static str;

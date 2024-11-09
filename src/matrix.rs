@@ -3,8 +3,10 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 use num_traits::{Float, One, Zero};
 use primitive::{
     iter::Lookahead1,
-    ops::float::FloatExt,
-    seq::{Seq, SeqMut},
+    ops::{
+        float::FloatExt,
+        slice::{AsSlice, AsSliceMut},
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -43,7 +45,7 @@ pub struct MatrixBuf<T, F> {
 }
 impl<T, F> Container2D<F> for MatrixBuf<T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     fn size(&self) -> Size {
@@ -56,7 +58,7 @@ where
 }
 impl<T, F> Container2DMut<F> for MatrixBuf<T, F>
 where
-    T: SeqMut<F>,
+    T: AsSliceMut<F>,
     F: Float,
 {
     fn set(&mut self, index: Index, value: F) {
@@ -66,7 +68,7 @@ where
 }
 impl<T, F> MatrixBuf<T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     pub fn new(size: Size, buf: T) -> Self {
@@ -91,7 +93,7 @@ where
 
     pub fn transpose(&self) -> Self
     where
-        T: Clone + SeqMut<F>,
+        T: Clone + AsSliceMut<F>,
     {
         let buf = self.buf.clone();
         let size = Size {
@@ -191,7 +193,7 @@ pub struct PartialMatrix<'orig, T, F> {
 }
 impl<'orig, T, F> PartialMatrix<'orig, T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     pub fn new(matrix: &'orig MatrixBuf<T, F>, start: Index, end: Index) -> Self {
@@ -213,7 +215,7 @@ where
 }
 impl<T, F> Container2D<F> for PartialMatrix<'_, T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     fn size(&self) -> Size {
@@ -232,7 +234,7 @@ where
 }
 impl<T, F> PartialMatrix<'_, T, F>
 where
-    T: Seq<F>,
+    T: AsSlice<F>,
     F: Float,
 {
     pub fn transpose(&self) -> VecMatrix<F> {

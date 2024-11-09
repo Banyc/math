@@ -14,9 +14,9 @@ num-traits = "0.2"
 primitive = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 strict-num = { workspace = true, features = ["serde"] }
-thiserror = "1"
+thiserror = "2"
 
 [workspace.dependencies]
-primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.23" }
+primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.44" }
 statistical_inference = { git = "https://github.com/Banyc/statistical_inference.git", tag = "v0.0.3" }
 strict-num = "0.2"

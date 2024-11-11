@@ -2,7 +2,7 @@ use core::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::{Float, One, Zero};
 use primitive::{
-    iter::Lookahead1,
+    iter::lookahead::Lookahead1,
     ops::{
         float::FloatExt,
         slice::{AsSlice, AsSliceMut},

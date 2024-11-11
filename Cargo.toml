@@ -17,6 +17,6 @@ strict-num = { workspace = true, features = ["serde"] }
 thiserror = "2"
 
 [workspace.dependencies]
-primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.44" }
+primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.50" }
 statistical_inference = { git = "https://github.com/Banyc/statistical_inference.git", tag = "v0.0.3" }
 strict-num = "0.2"

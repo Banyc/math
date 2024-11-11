@@ -9,7 +9,7 @@ use math::{
     transformer::Estimate,
 };
 use polars::prelude::*;
-use primitive::iter::{AssertIteratorItemExt, VecZip};
+use primitive::iter::{assertion::AssertIteratorItemExt, vec_zip::VecZip};
 use strict_num::{FiniteF64, NormalizedF64};
 
 #[derive(Debug, Clone, Args)]

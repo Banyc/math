@@ -1,7 +1,7 @@
 use core::num::NonZeroUsize;
 use std::collections::HashMap;
 
-use primitive::iter::AssertIteratorItemExt;
+use primitive::iter::assertion::AssertIteratorItemExt;
 use strict_num::FiniteF64;
 use thiserror::Error;
 

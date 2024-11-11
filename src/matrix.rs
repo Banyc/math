@@ -10,22 +10,22 @@ use primitive::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Index {
+pub struct Index2D {
     pub row: usize,
     pub col: usize,
 }
-impl Index {
+impl Index2D {
     pub(crate) fn to_1(self, cols: NonZeroUsize) -> usize {
         self.row * cols.get() + self.col
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Size {
+pub struct Size2D {
     pub rows: NonZeroUsize,
     pub cols: NonZeroUsize,
 }
-impl Size {
+impl Size2D {
     pub fn volume(&self) -> NonZeroUsize {
         let volume = self.rows.get() * self.cols.get();
         NonZeroUsize::new(volume).unwrap()
@@ -39,7 +39,7 @@ pub type ArrayMatrix<F, const N: usize> = MatrixBuf<[F; N], F>;
 pub type VecMatrix<F> = MatrixBuf<Vec<F>, F>;
 #[derive(Debug, Clone)]
 pub struct MatrixBuf<T, F> {
-    size: Size,
+    size: Size2D,
     buf: T,
     float: PhantomData<F>,
 }
@@ -48,10 +48,10 @@ where
     T: AsSlice<F>,
     F: Float,
 {
-    fn size(&self) -> Size {
+    fn size(&self) -> Size2D {
         self.size
     }
-    fn get(&self, index: Index) -> F {
+    fn get(&self, index: Index2D) -> F {
         let index = self.index_2_to_1(index);
         self.buf.as_slice()[index]
     }
@@ -61,7 +61,7 @@ where
     T: AsSliceMut<F>,
     F: Float,
 {
-    fn set(&mut self, index: Index, value: F) {
+    fn set(&mut self, index: Index2D, value: F) {
         let index = self.index_2_to_1(index);
         self.buf.as_slice_mut()[index] = value;
     }
@@ -71,7 +71,7 @@ where
     T: AsSlice<F>,
     F: Float,
 {
-    pub fn new(size: Size, buf: T) -> Self {
+    pub fn new(size: Size2D, buf: T) -> Self {
         if buf.as_slice().len() < size.volume().get() {
             panic!("not enough buffer size");
         }
@@ -96,7 +96,7 @@ where
         T: Clone + AsSliceMut<F>,
     {
         let buf = self.buf.clone();
-        let size = Size {
+        let size = Size2D {
             rows: self.size().cols,
             cols: self.size().rows,
         };
@@ -118,14 +118,14 @@ where
     }
 
     fn full_partial(&self) -> PartialMatrix<'_, T, F> {
-        let start = Index { row: 0, col: 0 };
-        let end = Index {
+        let start = Index2D { row: 0, col: 0 };
+        let end = Index2D {
             row: self.size().rows.get(),
             col: self.size().cols.get(),
         };
         PartialMatrix::new(self, start, end)
     }
-    fn index_2_to_1(&self, index: Index) -> usize {
+    fn index_2_to_1(&self, index: Index2D) -> usize {
         if self.size().cols.get() <= index.col {
             panic!("col out of range");
         }
@@ -139,12 +139,12 @@ impl<F> VecMatrix<F>
 where
     F: Float,
 {
-    pub fn zero(size: Size) -> Self {
+    pub fn zero(size: Size2D) -> Self {
         let buf = vec![Zero::zero(); size.volume().get()];
         MatrixBuf::new(size, buf)
     }
     pub fn identity(rows: NonZeroUsize) -> Self {
-        let size = Size { rows, cols: rows };
+        let size = Size2D { rows, cols: rows };
         let mut matrix = Self::zero(size);
         identity(rows, &mut matrix);
         matrix
@@ -154,12 +154,12 @@ impl<const N: usize, F> ArrayMatrix<F, N>
 where
     F: Float,
 {
-    pub fn zero(size: Size) -> Self {
+    pub fn zero(size: Size2D) -> Self {
         let buf = [Zero::zero(); N];
         MatrixBuf::new(size, buf)
     }
     pub fn identity(rows: NonZeroUsize) -> Self {
-        let size = Size { rows, cols: rows };
+        let size = Size2D { rows, cols: rows };
         let mut matrix = Self::zero(size);
         identity(rows, &mut matrix);
         matrix
@@ -179,7 +179,7 @@ where
     T: One,
 {
     for row in 0..rows.get() {
-        let index = Index { row, col: row };
+        let index = Index2D { row, col: row };
         zero.set(index, One::one());
     }
 }
@@ -187,16 +187,16 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct PartialMatrix<'orig, T, F> {
     orig_matrix: &'orig MatrixBuf<T, F>,
-    start: Index,
+    start: Index2D,
     /// exclusive
-    end: Index,
+    end: Index2D,
 }
 impl<'orig, T, F> PartialMatrix<'orig, T, F>
 where
     T: AsSlice<F>,
     F: Float,
 {
-    pub fn new(matrix: &'orig MatrixBuf<T, F>, start: Index, end: Index) -> Self {
+    pub fn new(matrix: &'orig MatrixBuf<T, F>, start: Index2D, end: Index2D) -> Self {
         let start_in_bound =
             start.row < matrix.size().rows.get() && start.col < matrix.size().cols.get();
         let end_in_bound =
@@ -218,17 +218,17 @@ where
     T: AsSlice<F>,
     F: Float,
 {
-    fn size(&self) -> Size {
+    fn size(&self) -> Size2D {
         let rows = self.end.row - self.start.row;
         let rows = NonZeroUsize::new(rows).unwrap();
         let cols = self.end.col - self.start.col;
         let cols = NonZeroUsize::new(cols).unwrap();
-        Size { rows, cols }
+        Size2D { rows, cols }
     }
-    fn get(&self, index: Index) -> F {
+    fn get(&self, index: Index2D) -> F {
         let row = index.row + self.start.row;
         let col = index.col + self.start.col;
-        let index = Index { row, col };
+        let index = Index2D { row, col };
         self.orig_matrix.get(index)
     }
 }
@@ -238,7 +238,7 @@ where
     F: Float,
 {
     pub fn transpose(&self) -> VecMatrix<F> {
-        let size = Size {
+        let size = Size2D {
             rows: self.size().cols,
             cols: self.size().rows,
         };
@@ -259,7 +259,7 @@ where
         if self.size().cols != other.size().rows {
             panic!("unmatched matrix shapes for mul");
         }
-        let size = Size {
+        let size = Size2D {
             rows: self.size().rows,
             cols: other.size().cols,
         };
@@ -283,11 +283,11 @@ where
 }
 
 pub trait Container2D<T> {
-    fn size(&self) -> Size;
-    fn get(&self, index: Index) -> T;
+    fn size(&self) -> Size2D;
+    fn get(&self, index: Index2D) -> T;
 }
 pub trait Container2DMut<T>: Container2D<T> {
-    fn set(&mut self, index: Index, value: T);
+    fn set(&mut self, index: Index2D, value: T);
 }
 pub trait Matrix<T>: Container2D<T>
 where
@@ -299,7 +299,7 @@ where
     {
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
+                let index = Index2D { row, col };
                 let value = self.get(index);
                 let value = op(value);
                 self.set(index, value);
@@ -313,7 +313,7 @@ where
         assert_eq!(self.size(), other.size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
+                let index = Index2D { row, col };
                 let other = other.get(index);
                 let this = self.get(index);
                 let value = op(this, other);
@@ -325,7 +325,7 @@ where
         assert_eq!(self.size(), other.size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
+                let index = Index2D { row, col };
                 let other = other.get(index);
                 let this = self.get(index);
                 if !this.closes_to(other) {
@@ -336,8 +336,8 @@ where
         true
     }
 
-    fn mul_matrix_size(&self, other: &impl Container2D<T>) -> Size {
-        Size {
+    fn mul_matrix_size(&self, other: &impl Container2D<T>) -> Size2D {
+        Size2D {
             rows: self.size().rows,
             cols: other.size().cols,
         }
@@ -346,12 +346,12 @@ where
         assert_eq!(out.size(), self.mul_matrix_size(other));
         for row in 0..self.size().rows.get() {
             for col in 0..other.size().cols.get() {
-                let index = Index { row, col };
+                let index = Index2D { row, col };
                 let mut sum = Zero::zero();
 
                 for i in 0..self.size().cols.get() {
-                    let a = Index { row, col: i };
-                    let b = Index { row: i, col };
+                    let a = Index2D { row, col: i };
+                    let b = Index2D { row: i, col };
                     let a = self.get(a);
                     let b = other.get(b);
                     sum = sum + (a * b);
@@ -362,8 +362,8 @@ where
         }
     }
 
-    fn transpose_size(&self) -> Size {
-        Size {
+    fn transpose_size(&self) -> Size2D {
+        Size2D {
             rows: self.size().cols,
             cols: self.size().rows,
         }
@@ -372,14 +372,14 @@ where
         assert_eq!(out.size(), self.transpose_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let value = self.get(Index { row, col });
-                let index = Index { row: col, col: row };
+                let value = self.get(Index2D { row, col });
+                let index = Index2D { row: col, col: row };
                 out.set(index, value);
             }
         }
     }
 
-    fn submatrix_size(&self, excluded_rows: usize, excluded_cols: usize) -> Size {
+    fn submatrix_size(&self, excluded_rows: usize, excluded_cols: usize) -> Size2D {
         let rows = self.size().rows.get().checked_sub(excluded_rows).unwrap();
         let cols = self.size().cols.get().checked_sub(excluded_cols).unwrap();
         let Some(rows) = NonZeroUsize::new(rows) else {
@@ -388,7 +388,7 @@ where
         let Some(cols) = NonZeroUsize::new(cols) else {
             panic!("zero cols");
         };
-        Size { rows, cols }
+        Size2D { rows, cols }
     }
     fn submatrix_in(
         &self,
@@ -416,8 +416,8 @@ where
                     excluded_cols.pop();
                     continue;
                 }
-                let value = self.get(Index { row, col });
-                let index = Index {
+                let value = self.get(Index2D { row, col });
+                let index = Index2D {
                     row: row_i,
                     col: col_i,
                 };
@@ -443,18 +443,18 @@ where
             panic!("not a square matrix");
         }
         if self.size().rows.get() == 1 {
-            return self.get(Index { row: 0, col: 0 });
+            return self.get(Index2D { row: 0, col: 0 });
         }
         if self.size().rows.get() == 2 {
-            return self.get(Index { row: 0, col: 0 }) * self.get(Index { row: 1, col: 1 })
-                - self.get(Index { row: 0, col: 1 }) * self.get(Index { row: 1, col: 0 });
+            return self.get(Index2D { row: 0, col: 0 }) * self.get(Index2D { row: 1, col: 1 })
+                - self.get(Index2D { row: 0, col: 1 }) * self.get(Index2D { row: 1, col: 0 });
         }
 
         let mut matrix = VecMatrix::<T>::zero(self.submatrix_size(1, 1));
         let mut sum = Zero::zero();
         let mut alt_sign = One::one();
         for col in 0..self.size().cols.get() {
-            let index = Index { row: 0, col };
+            let index = Index2D { row: 0, col };
             let value = self.get(index);
             self.submatrix_in(&[0], &[col], &mut matrix);
             let det = matrix.determinant();
@@ -465,10 +465,10 @@ where
         sum
     }
 
-    fn matrix_of_minors_size(&self) -> Size {
+    fn matrix_of_minors_size(&self) -> Size2D {
         self.size()
     }
-    fn minor_size(&self) -> Size {
+    fn minor_size(&self) -> Size2D {
         self.submatrix_size(1, 1)
     }
     fn matrix_of_minors_in(
@@ -479,7 +479,7 @@ where
         assert_eq!(out.size(), self.matrix_of_minors_size());
         for row in 0..self.size().rows.get() {
             for col in 0..self.size().cols.get() {
-                let index = Index { row, col };
+                let index = Index2D { row, col };
                 self.submatrix_in(&[row], &[col], minor);
                 let det = minor.determinant();
                 out.set(index, det);
@@ -487,7 +487,7 @@ where
         }
     }
 
-    fn matrix_of_cofactors_size(&self) -> Size {
+    fn matrix_of_cofactors_size(&self) -> Size2D {
         self.matrix_of_minors_size()
     }
     fn matrix_of_cofactors_in(
@@ -501,14 +501,14 @@ where
                 let is_even = (row + col) % 2 == 0;
                 let sign = if is_even { 1. } else { -1. };
                 let sign = T::from(sign).unwrap();
-                let index = Index { row, col };
+                let index = Index2D { row, col };
                 let value = out.get(index);
                 out.set(index, value * sign);
             }
         }
     }
 
-    fn adjugate_size(&self) -> Size {
+    fn adjugate_size(&self) -> Size2D {
         self.transpose_size()
     }
     fn adjugate_in(
@@ -521,7 +521,7 @@ where
         matrix_of_cofactors.transpose_in(out);
     }
 
-    fn inverse_size(&self) -> Size {
+    fn inverse_size(&self) -> Size2D {
         self.adjugate_size()
     }
     fn inverse_in(
@@ -549,23 +549,23 @@ mod tests {
     #[test]
     fn test_cell() {
         let buf = vec![0., 1., 2., 3., 4., 5.];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let matrix = MatrixBuf::new(size, buf);
-        assert_eq!(matrix.get(Index { row: 0, col: 0 }), 0.);
-        assert_eq!(matrix.get(Index { row: 0, col: 1 }), 1.);
-        assert_eq!(matrix.get(Index { row: 0, col: 2 }), 2.);
-        assert_eq!(matrix.get(Index { row: 1, col: 0 }), 3.);
-        assert_eq!(matrix.get(Index { row: 1, col: 1 }), 4.);
-        assert_eq!(matrix.get(Index { row: 1, col: 2 }), 5.);
+        assert_eq!(matrix.get(Index2D { row: 0, col: 0 }), 0.);
+        assert_eq!(matrix.get(Index2D { row: 0, col: 1 }), 1.);
+        assert_eq!(matrix.get(Index2D { row: 0, col: 2 }), 2.);
+        assert_eq!(matrix.get(Index2D { row: 1, col: 0 }), 3.);
+        assert_eq!(matrix.get(Index2D { row: 1, col: 1 }), 4.);
+        assert_eq!(matrix.get(Index2D { row: 1, col: 2 }), 5.);
     }
 
     #[test]
     fn test_add() {
         let buf = vec![0., 1., 2., 3., 4., 5.];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn test_mul() {
         let buf = vec![0., 1., 2., 3., 4., 5.];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
@@ -591,13 +591,13 @@ mod tests {
     #[test]
     fn test_transpose() {
         let buf = vec![0., 1., 2., 3., 4., 5.];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
         let matrix = MatrixBuf::new(size, buf);
         let matrix = matrix.transpose();
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
@@ -614,7 +614,7 @@ mod tests {
     #[test]
     fn test_determinant() {
         let buf = vec![3., 8., 4., 6.];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
@@ -626,7 +626,7 @@ mod tests {
             4., -2., 5., //
             2., 8., 7., //
         ];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
@@ -641,7 +641,7 @@ mod tests {
             2., 0., -2., //
             0., 1., 1., //
         ];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
@@ -661,7 +661,7 @@ mod tests {
             2.0, 1.0, //
             1.0, 1.0, //
         ];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
@@ -683,7 +683,7 @@ mod tests {
             1., 2., 3., //
             4., 5., 6., //
         ];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(3).unwrap(),
         };
@@ -694,14 +694,14 @@ mod tests {
             9., 10., //
             11., 12., //
         ];
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(3).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };
         let b = MatrixBuf::new(size, buf);
 
         let matrix = a.mul_matrix(&b);
-        let size = Size {
+        let size = Size2D {
             rows: NonZeroUsize::new(2).unwrap(),
             cols: NonZeroUsize::new(2).unwrap(),
         };

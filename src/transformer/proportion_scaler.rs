@@ -1,5 +1,5 @@
 use getset::CopyGetters;
-use strict_num::PositiveF64;
+use crate::NonNegR;
 use thiserror::Error;
 
 use super::{Estimate, Transform};
@@ -15,8 +15,8 @@ impl Estimate<f64> for ProportionScalingEstimator {
         Self: Sized,
     {
         let examples = examples
-            .map(PositiveF64::new)
-            .collect::<Option<Vec<PositiveF64>>>();
+            .map(NonNegR::new)
+            .collect::<Option<Vec<NonNegR<f64>>>>();
         let examples = examples.ok_or(ProportionScalingEstimatorError::InvalidInput)?;
         self.fit(examples.iter().copied())
             .map_err(ProportionScalingEstimatorError::Inner)
@@ -29,19 +29,19 @@ pub enum ProportionScalingEstimatorError {
     #[error("{0}")]
     Inner(InfiniteSum),
 }
-impl Estimate<PositiveF64> for ProportionScalingEstimator {
+impl Estimate<NonNegR<f64>> for ProportionScalingEstimator {
     type Err = InfiniteSum;
     type Output = ProportionScaler;
 
     fn fit(
         &self,
-        examples: impl Iterator<Item = PositiveF64> + Clone,
+        examples: impl Iterator<Item = NonNegR<f64>> + Clone,
     ) -> Result<Self::Output, Self::Err>
     where
         Self: Sized,
     {
         let sum = examples.map(|x| x.get()).sum();
-        let Some(sum) = PositiveF64::new(sum) else {
+        let Some(sum) = NonNegR::new(sum) else {
             return Err(InfiniteSum);
         };
         Ok(ProportionScaler { sum })
@@ -54,13 +54,13 @@ pub struct InfiniteSum;
 #[derive(Debug, Clone, Copy, CopyGetters)]
 pub struct ProportionScaler {
     #[getset(get_copy = "pub")]
-    sum: PositiveF64,
+    sum: NonNegR<f64>,
 }
 impl Transform<f64> for ProportionScaler {
     type Err = ProportionScalerError;
 
     fn transform(&self, x: f64) -> Result<f64, Self::Err> {
-        let x = PositiveF64::new(x).ok_or(ProportionScalerError::InvalidInput)?;
+        let x = NonNegR::new(x).ok_or(ProportionScalerError::InvalidInput)?;
         self.transform(x)
             .map(|x| x.get())
             .map_err(ProportionScalerError::Inner)
@@ -73,15 +73,15 @@ pub enum ProportionScalerError {
     #[error("{0}")]
     Inner(GreaterThanSum),
 }
-impl Transform<PositiveF64> for ProportionScaler {
+impl Transform<NonNegR<f64>> for ProportionScaler {
     type Err = GreaterThanSum;
 
-    fn transform(&self, x: PositiveF64) -> Result<PositiveF64, Self::Err> {
+    fn transform(&self, x: NonNegR<f64>) -> Result<NonNegR<f64>, Self::Err> {
         if self.sum.get() < x.get() {
             return Err(GreaterThanSum);
         }
         let scaled = x.get() / self.sum.get();
-        Ok(PositiveF64::new(scaled).unwrap())
+        Ok(NonNegR::new(scaled).unwrap())
     }
 }
 #[derive(Debug, Error, Clone, Copy)]

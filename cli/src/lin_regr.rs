@@ -9,8 +9,10 @@ use math::{
     transformer::Estimate,
 };
 use polars::prelude::*;
-use primitive::iter::{assertion::AssertIteratorItemExt, vec_zip::VecZip};
-use strict_num::{FiniteF64, NormalizedF64};
+use primitive::{
+    iter::{assertion::AssertIteratorItemExt, vec_zip::VecZip},
+    ops::float::{UnitR, R},
+};
 
 #[derive(Debug, Clone, Args)]
 pub struct LinRegrArgs {
@@ -49,14 +51,14 @@ impl LinRegrArgs {
                 columns
                     .into_iter()
                     .assert_item::<Option<f64>>()
-                    .map(|column| column.and_then(FiniteF64::new))
-                    .assert_item::<Option<FiniteF64>>()
-                    .collect::<Option<Vec<FiniteF64>>>()
+                    .map(|column| column.and_then(R::new))
+                    .assert_item::<Option<R<f64>>>()
+                    .collect::<Option<Vec<R<f64>>>>()
             })
             .map(|columns| {
-                let mut columns = columns.into_iter().assert_item::<FiniteF64>();
+                let mut columns = columns.into_iter().assert_item::<R<f64>>();
                 let y = columns.next().unwrap();
-                let x = columns.collect::<Vec<FiniteF64>>();
+                let x = columns.collect::<Vec<R<f64>>>();
                 Example { x, y }
             })
             .collect::<Vec<Example>>();
@@ -84,30 +86,33 @@ impl LinRegrArgs {
 }
 
 struct Example {
-    pub x: Vec<FiniteF64>,
-    pub y: FiniteF64,
+    pub x: Vec<R<f64>>,
+    pub y: R<f64>,
 }
 impl Sample for &Example {
-    fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone {
+    fn predictors(&self) -> impl Iterator<Item = R<f64>> + Clone {
         self.x.iter().copied()
     }
-    fn response(&self) -> FiniteF64 {
+    fn response(&self) -> R<f64> {
         self.y
     }
 }
 
-fn two_sided_p_values(params: &TTestParams) -> Vec<NormalizedF64> {
+fn two_sided_p_values(params: &TTestParams) -> Vec<UnitR<f64>> {
     let t = params
         .t
         .iter()
         .copied()
-        .map(FiniteF64::new)
-        .collect::<Option<Vec<FiniteF64>>>()
+        .map(R::new)
+        .collect::<Option<Vec<R<f64>>>>()
         .unwrap();
     t.iter()
         .copied()
         .map(|t| {
-            statistical_inference::distributions::t::T_SCORE_TABLE.p_value_two_sided(params.df, t)
+            let t = statistical_inference::R::new(t.get()).unwrap();
+            let p = statistical_inference::distributions::t::T_SCORE_TABLE
+                .p_value_two_sided(params.df, t);
+            UnitR::new(p.get()).unwrap()
         })
-        .collect::<Vec<NormalizedF64>>()
+        .collect::<Vec<UnitR<f64>>>()
 }

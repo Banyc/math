@@ -1,19 +1,19 @@
 use core::ops::RangeInclusive;
 
-use strict_num::{FiniteF64, PositiveF64};
+use crate::{NonNegR, R};
 use thiserror::Error;
 
 use super::{Estimate, Transform};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MinMaxScalingEstimator {
-    range: RangeInclusive<FiniteF64>,
+    range: RangeInclusive<R<f64>>,
 }
 impl MinMaxScalingEstimator {
     pub fn new(
-        range: RangeInclusive<FiniteF64>,
+        range: RangeInclusive<R<f64>>,
     ) -> Result<Self, InfiniteOrNegativeGivenRangeLengthError> {
-        if PositiveF64::new(range.end().get() - range.start().get()).is_none() {
+        if NonNegR::new(range.end().get() - range.start().get()).is_none() {
             return Err(InfiniteOrNegativeGivenRangeLengthError);
         }
         Ok(Self { range })
@@ -22,7 +22,7 @@ impl MinMaxScalingEstimator {
 impl Default for MinMaxScalingEstimator {
     fn default() -> Self {
         Self {
-            range: FiniteF64::new(0.).unwrap()..=FiniteF64::new(1.).unwrap(),
+            range: R::new(0.).unwrap()..=R::new(1.).unwrap(),
         }
     }
 }
@@ -34,9 +34,7 @@ impl Estimate<f64> for MinMaxScalingEstimator {
     where
         Self: Sized,
     {
-        let examples = examples
-            .map(FiniteF64::new)
-            .collect::<Option<Vec<FiniteF64>>>();
+        let examples = examples.map(R::new).collect::<Option<Vec<R<f64>>>>();
         let examples = examples.ok_or(MinMaxScalingEstimateError2::InvalidInput)?;
         self.fit(examples.iter().copied())
             .map_err(MinMaxScalingEstimateError2::Inner)
@@ -49,14 +47,11 @@ pub enum MinMaxScalingEstimateError2 {
     #[error("{0}")]
     Inner(MinMaxScalingEstimateError),
 }
-impl Estimate<FiniteF64> for MinMaxScalingEstimator {
+impl Estimate<R<f64>> for MinMaxScalingEstimator {
     type Err = MinMaxScalingEstimateError;
     type Output = MinMaxScaler;
 
-    fn fit(
-        &self,
-        examples: impl Iterator<Item = FiniteF64> + Clone,
-    ) -> Result<Self::Output, Self::Err>
+    fn fit(&self, examples: impl Iterator<Item = R<f64>> + Clone) -> Result<Self::Output, Self::Err>
     where
         Self: Sized,
     {
@@ -75,13 +70,13 @@ impl Estimate<FiniteF64> for MinMaxScalingEstimator {
         if max < min {
             return Err(Self::Err::EmptySequenceError);
         };
-        if FiniteF64::new(max - min).is_none() {
+        if R::new(max - min).is_none() {
             return Err(Self::Err::InfiniteMinMaxRange);
         }
 
         Ok(MinMaxScaler {
-            min: FiniteF64::new(min).unwrap(),
-            max: FiniteF64::new(max).unwrap(),
+            min: R::new(min).unwrap(),
+            max: R::new(max).unwrap(),
             range: self.range.clone(),
         })
     }
@@ -99,15 +94,15 @@ pub struct InfiniteOrNegativeGivenRangeLengthError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MinMaxScaler {
-    min: FiniteF64,
-    max: FiniteF64,
-    range: core::ops::RangeInclusive<FiniteF64>,
+    min: R<f64>,
+    max: R<f64>,
+    range: core::ops::RangeInclusive<R<f64>>,
 }
 impl Transform<f64> for MinMaxScaler {
     type Err = MinMaxScalerError;
 
     fn transform(&self, x: f64) -> Result<f64, Self::Err> {
-        let x = FiniteF64::new(x).ok_or(MinMaxScalerError::InvalidInput)?;
+        let x = R::new(x).ok_or(MinMaxScalerError::InvalidInput)?;
         self.transform(x)
             .map(|x| x.get())
             .map_err(MinMaxScalerError::Inner)
@@ -120,17 +115,17 @@ pub enum MinMaxScalerError {
     #[error("{0}")]
     Inner(OutOfRange),
 }
-impl Transform<FiniteF64> for MinMaxScaler {
+impl Transform<R<f64>> for MinMaxScaler {
     type Err = OutOfRange;
 
-    fn transform(&self, x: FiniteF64) -> Result<FiniteF64, Self::Err> {
+    fn transform(&self, x: R<f64>) -> Result<R<f64>, Self::Err> {
         if !(self.min..=self.max).contains(&x) {
             return Err(OutOfRange);
         }
         let x_std = (x.get() - self.min.get()) / (self.max.get() - self.min.get());
         let scaled =
             x_std * (self.range.end().get() - self.range.start().get()) + self.range.start().get();
-        Ok(FiniteF64::new(scaled).unwrap())
+        Ok(R::new(scaled).unwrap())
     }
 }
 #[derive(Debug, Error, Clone, Copy)]
@@ -146,26 +141,26 @@ mod tests {
     #[test]
     fn test() {
         let examples = [-1.0, -0.5, 0.0, 1.0];
-        let examples = examples.into_iter().map(|x| FiniteF64::new(x).unwrap());
+        let examples = examples.into_iter().map(|x| R::new(x).unwrap());
         let scaler = examples
             .clone()
             .fit(&MinMaxScalingEstimator::default())
             .unwrap();
-        assert_eq!(scaler.max, 1.0);
+        assert_eq!(scaler.max.get(), 1.0);
         let transformed = examples.transform_by(scaler);
-        let x = transformed.collect::<Result<Vec<FiniteF64>, _>>().unwrap();
-        assert_eq!(x, [0.0, 0.25, 0.5, 1.0]);
+        let x = transformed.collect::<Result<Vec<R<f64>>, _>>().unwrap();
+        assert_eq!(
+            x.iter().map(|x| x.get()).collect::<Vec<f64>>(),
+            [0.0, 0.25, 0.5, 1.0]
+        );
     }
 
     #[test]
     fn test_edge() {
-        assert!(MinMaxScalingEstimator::new(
-            FiniteF64::new(1.0).unwrap()..=FiniteF64::new(0.0).unwrap()
-        )
-        .is_err());
+        assert!(MinMaxScalingEstimator::new(R::new(1.0).unwrap()..=R::new(0.0).unwrap()).is_err());
 
         let examples = [f64::MIN, f64::MAX];
-        let examples = examples.into_iter().map(|x| FiniteF64::new(x).unwrap());
+        let examples = examples.into_iter().map(|x| R::new(x).unwrap());
         assert!(examples
             .fit_transform(&MinMaxScalingEstimator::default())
             .is_err());

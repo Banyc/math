@@ -1,28 +1,29 @@
+use crate::UnitR;
+
 use primitive::ops::float::FloatExt;
-use strict_num::NormalizedF64;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Probability(NormalizedF64);
+pub struct Probability(UnitR<f64>);
 impl Probability {
     /// # Option
     ///
     /// Return [`None`] if `p` is not in `[0, 1]`
     #[must_use]
     pub fn new(p: f64) -> Option<Self> {
-        let p = NormalizedF64::new(p)?;
+        let p = UnitR::new(p)?;
         Some(Self(p))
     }
     #[must_use]
     pub fn certainty() -> Self {
-        Self(NormalizedF64::new(1.0).unwrap())
+        Self(UnitR::new(1.0).unwrap())
     }
     #[must_use]
     pub fn impossibility() -> Self {
-        Self(NormalizedF64::new(0.0).unwrap())
+        Self(UnitR::new(0.0).unwrap())
     }
     #[must_use]
     pub fn complementary(&self) -> Self {
-        Self(NormalizedF64::new(1.0 - self.0.get()).unwrap())
+        Self(UnitR::new(1.0 - self.0.get()).unwrap())
     }
     #[must_use]
     pub fn get(&self) -> f64 {
@@ -53,13 +54,13 @@ impl core::ops::Mul for Probability {
         Self::new(self.get() * rhs.get()).unwrap()
     }
 }
-impl From<Probability> for NormalizedF64 {
+impl From<Probability> for UnitR<f64> {
     fn from(value: Probability) -> Self {
-        NormalizedF64::new(value.get()).unwrap()
+        UnitR::new(value.get()).unwrap()
     }
 }
-impl From<NormalizedF64> for Probability {
-    fn from(value: NormalizedF64) -> Self {
+impl From<UnitR<f64>> for Probability {
+    fn from(value: UnitR<f64>) -> Self {
         Self::new(value.get()).unwrap()
     }
 }

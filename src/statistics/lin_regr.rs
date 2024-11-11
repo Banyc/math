@@ -1,12 +1,11 @@
 use core::num::NonZeroUsize;
 use std::collections::HashMap;
 
-use primitive::iter::assertion::AssertIteratorItemExt;
-use strict_num::FiniteF64;
+use primitive::{iter::assertion::AssertIteratorItemExt, ops::float::R};
 use thiserror::Error;
 
 use crate::{
-    matrix::{Container2D, Index, MatrixBuf, Size, VecMatrix},
+    matrix::{Container2D, Index2D, MatrixBuf, Size2D, VecMatrix},
     statistics::variance::VarianceExt,
     transformer::Estimate,
 };
@@ -14,8 +13,8 @@ use crate::{
 use super::{standard_deviation::StandardDeviationExt, EmptySequenceError};
 
 pub trait Sample {
-    fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone;
-    fn response(&self) -> FiniteF64;
+    fn predictors(&self) -> impl Iterator<Item = R<f64>> + Clone;
+    fn response(&self) -> R<f64>;
 }
 
 #[derive(Debug, Clone)]
@@ -55,7 +54,7 @@ where
         XTy_data.push(y_sum);
         XTy_data.extend(x_y_sums.iter().copied());
         let XTy_rows = NonZeroUsize::new(k.get() + 1).unwrap();
-        let size = Size {
+        let size = Size2D {
             rows: XTy_rows,
             cols: NonZeroUsize::new(1).unwrap(),
         };
@@ -65,7 +64,7 @@ where
 
         let mut slopes = vec![];
         for row in 0..b.size().rows.get() {
-            let slope = b.get(Index { row, col: 0 });
+            let slope = b.get(Index2D { row, col: 0 });
             slopes.push(slope);
         }
         Ok(LinearRegressionBuf::new(slopes))
@@ -152,7 +151,7 @@ where
             XTX_data.push(*x_x_sums.get(&(min, max)).unwrap());
         }
     }
-    let size = Size {
+    let size = Size2D {
         rows: XTX_rows,
         cols: XTX_rows,
     };
@@ -278,7 +277,7 @@ pub trait LinearRegressionExt: LinearRegression {
         let XTX_inv = XTX_inv(examples.clone()).map_err(TTestParamsError::Examples)?;
         let mut slope_standard_errors = vec![];
         for i in 1..=k {
-            let index = Index { row: i, col: i };
+            let index = Index2D { row: i, col: i };
             let value = XTX_inv.get(index);
             let se = residual_standard_error * value.sqrt();
             slope_standard_errors.push(se);
@@ -323,15 +322,15 @@ mod tests {
     use super::*;
 
     pub struct TheSample {
-        pub x: Vec<FiniteF64>,
-        pub y: FiniteF64,
+        pub x: Vec<R<f64>>,
+        pub y: R<f64>,
     }
     impl Sample for &TheSample {
-        fn predictors(&self) -> impl Iterator<Item = FiniteF64> + Clone {
+        fn predictors(&self) -> impl Iterator<Item = R<f64>> + Clone {
             self.x.iter().copied()
         }
 
-        fn response(&self) -> FiniteF64 {
+        fn response(&self) -> R<f64> {
             self.y
         }
     }
@@ -343,10 +342,10 @@ mod tests {
             .into_iter()
             .map(|(x, y)| TheSample {
                 x: x.into_iter()
-                    .map(FiniteF64::new)
-                    .collect::<Option<Vec<FiniteF64>>>()
+                    .map(R::new)
+                    .collect::<Option<Vec<R<f64>>>>()
                     .unwrap(),
-                y: FiniteF64::new(y).unwrap(),
+                y: R::new(y).unwrap(),
             })
             .collect::<Vec<TheSample>>();
         let estimator = LinearRegressionEstimator;
@@ -373,10 +372,10 @@ mod tests {
             .map(|(x, y)| TheSample {
                 x: x.iter()
                     .copied()
-                    .map(FiniteF64::new)
-                    .collect::<Option<Vec<FiniteF64>>>()
+                    .map(R::new)
+                    .collect::<Option<Vec<R<f64>>>>()
                     .unwrap(),
-                y: FiniteF64::new(*y).unwrap(),
+                y: R::new(*y).unwrap(),
             })
             .collect::<Vec<TheSample>>();
         let estimator = LinearRegressionEstimator;
@@ -432,10 +431,10 @@ mod tests {
             .map(|(x, y)| TheSample {
                 x: x.iter()
                     .copied()
-                    .map(FiniteF64::new)
-                    .collect::<Option<Vec<FiniteF64>>>()
+                    .map(R::new)
+                    .collect::<Option<Vec<R<f64>>>>()
                     .unwrap(),
-                y: FiniteF64::new(*y).unwrap(),
+                y: R::new(*y).unwrap(),
             })
             .collect::<Vec<TheSample>>();
         let estimator = LinearRegressionEstimator;

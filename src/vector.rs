@@ -1,8 +1,10 @@
 use core::{marker::PhantomData, num::NonZeroUsize};
 
 use num_traits::Float;
-use primitive::ops::slice::{AsSlice, AsSliceMut};
-use strict_num::NormalizedF64;
+use primitive::ops::{
+    float::UnitR,
+    slice::{AsSlice, AsSliceMut},
+};
 
 use crate::{
     graphics::lerp,
@@ -96,7 +98,7 @@ where
         Self: Sized,
     {
         let rows = NonZeroUsize::new(self.as_slice().len())?;
-        let size = matrix::Size {
+        let size = matrix::Size2D {
             rows,
             cols: NonZeroUsize::new(1).unwrap(),
         };
@@ -161,7 +163,7 @@ where
         self.sub(other);
         self.mag()
     }
-    fn lerp(&mut self, other: &impl AsSlice<F>, t: NormalizedF64) {
+    fn lerp(&mut self, other: &impl AsSlice<F>, t: UnitR<f64>) {
         self.zip_mut_with(other, |&a, &b| lerp(&(a..=b), t.into()));
     }
     fn rotate(&mut self, adjacent_axis: usize, opposite_axis: usize, angle: F) {
@@ -217,7 +219,7 @@ where
     F: Float,
 {
     fn from(value: VectorBuf<T, F>) -> Self {
-        let size = matrix::Size {
+        let size = matrix::Size2D {
             rows: NonZeroUsize::new(value.as_slice().len()).unwrap(),
             cols: NonZeroUsize::new(1).unwrap(),
         };

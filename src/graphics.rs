@@ -1,5 +1,5 @@
+use crate::UnitR;
 use num_traits::Float;
-use strict_num::NormalizedF64;
 
 use crate::prob::Probability;
 
@@ -17,7 +17,7 @@ pub fn perlin_interpolation(t: Probability) -> Probability {
     let b = -15. * t.get().powi(4);
     let c = 10. * t.get().powi(3);
     let g = a + b + c;
-    NormalizedF64::new_clamped(g).into()
+    UnitR::new(g.clamp(0., 1.)).unwrap().into()
 }
 
 /// Generate n colors with equally spaced hues.

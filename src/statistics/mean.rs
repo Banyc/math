@@ -1,4 +1,4 @@
-use strict_num::FiniteF64;
+use crate::R;
 
 use super::EmptySequenceError;
 
@@ -20,16 +20,14 @@ where
 }
 
 pub trait FiniteMeanExt: Iterator {
-    fn mean(self) -> Result<FiniteF64, EmptySequenceError>;
+    fn mean(self) -> Result<R<f64>, EmptySequenceError>;
 }
 impl<T> FiniteMeanExt for T
 where
-    T: Iterator<Item = FiniteF64> + Clone,
+    T: Iterator<Item = R<f64>> + Clone,
 {
-    fn mean(self) -> Result<FiniteF64, EmptySequenceError> {
-        self.map(|x| x.get())
-            .mean()
-            .map(|x| FiniteF64::new(x).unwrap())
+    fn mean(self) -> Result<R<f64>, EmptySequenceError> {
+        self.map(|x| x.get()).mean().map(|x| R::new(x).unwrap())
     }
 }
 

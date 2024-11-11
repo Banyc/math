@@ -56,9 +56,9 @@ dependencies = [
 
 [[package]]
 name = "allocator-api2"
-version = "0.2.19"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "611cc2ae7d2e242c457e4be7f97036b8ad9ca152b499f53faf99b1ed8fc2553f"
+checksum = "45862d1c77f2228b9e10bc609d5bc203d86ebc9b87ad8d5d5167a6c9abf739d9"
 
 [[package]]
 name = "android-tzdata"
@@ -730,12 +730,6 @@ dependencies = [
  "crc32fast",
  "miniz_oxide",
 ]
-
-[[package]]
-name = "float-cmp"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
 
 [[package]]
 name = "float-cmp"
@@ -1440,8 +1434,6 @@ dependencies = [
  "getset",
  "num-traits",
  "primitive",
- "serde",
- "strict-num",
  "thiserror 2.0.3",
 ]
 
@@ -1456,7 +1448,6 @@ dependencies = [
  "polars",
  "primitive",
  "statistical_inference",
- "strict-num",
 ]
 
 [[package]]
@@ -2277,7 +2268,7 @@ dependencies = [
 [[package]]
 name = "primitive"
 version = "0.1.0"
-source = "git+https://github.com/Banyc/primitive.git?tag=v0.0.50#990635e4ef7e4301e9977c6ade7b0be47f028e0b"
+source = "git+https://github.com/Banyc/primitive.git?tag=v0.0.51#4a0803030cc0355f294d4bfb375f04e1002cd86b"
 dependencies = [
  "anyhow",
  "num-traits",
@@ -3002,11 +2993,10 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "statistical_inference"
 version = "0.1.0"
-source = "git+https://github.com/Banyc/statistical_inference.git?tag=v0.0.3#e7af02a9adebf3ec21e2adcb84db679e25ae8c9b"
+source = "git+https://github.com/Banyc/statistical_inference.git?tag=v0.0.4#88f69bb10429f32795ef5577617d05275a451d29"
 dependencies = [
- "once_cell",
+ "primitive",
  "reikna",
- "strict-num",
 ]
 
 [[package]]
@@ -3029,16 +3019,6 @@ name = "strength_reduce"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82"
-
-[[package]]
-name = "strict-num"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290fd5eab900654f4c270bc1cfaeb0f2c17b6851fa448fc22e1778dec105ac68"
-dependencies = [
- "float-cmp 0.9.0",
- "serde",
-]
 
 [[package]]
 name = "strsim"
@@ -3389,7 +3369,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9170e001f458781e92711d2ad666110f153e4e50bfd5cbd02db6547625714187"
 dependencies = [
- "float-cmp 0.10.0",
+ "float-cmp",
  "halfbrown",
  "itoa",
  "ryu",

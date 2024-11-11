@@ -1,6 +1,6 @@
 use core::num::NonZeroU32;
 
-use strict_num::FiniteF64;
+use crate::R;
 use thiserror::Error;
 
 pub trait DistanceExt: Iterator<Item = (f64, f64)> + Sized {
@@ -23,16 +23,16 @@ pub trait DistanceExt: Iterator<Item = (f64, f64)> + Sized {
 }
 impl<T: Iterator<Item = (f64, f64)>> DistanceExt for T {}
 
-pub trait FiniteDistanceExt: Iterator<Item = (FiniteF64, FiniteF64)> + Sized {
+pub trait FiniteDistanceExt: Iterator<Item = (R<f64>, R<f64>)> + Sized {
     /// # Panic
     ///
     /// If `p` cannot be converted into `i32`.
-    fn distance(self, p: NonZeroU32) -> Result<FiniteF64, InfiniteDistanceError> {
+    fn distance(self, p: NonZeroU32) -> Result<R<f64>, InfiniteDistanceError> {
         let d = self.map(|(a, b)| (a.get(), b.get())).distance(p);
-        FiniteF64::new(d).ok_or(InfiniteDistanceError)
+        R::new(d).ok_or(InfiniteDistanceError)
     }
 }
-impl<T: Iterator<Item = (FiniteF64, FiniteF64)>> FiniteDistanceExt for T {}
+impl<T: Iterator<Item = (R<f64>, R<f64>)>> FiniteDistanceExt for T {}
 #[derive(Debug, Error, Clone, Copy)]
 #[error("Infinite distance")]
 pub struct InfiniteDistanceError;
@@ -43,10 +43,7 @@ mod tests {
 
     #[test]
     fn test_distance() {
-        let polarized = [(
-            FiniteF64::new(f64::MIN).unwrap(),
-            FiniteF64::new(f64::MAX).unwrap(),
-        )];
+        let polarized = [(R::new(f64::MIN).unwrap(), R::new(f64::MAX).unwrap())];
         let distance = polarized
             .iter()
             .copied()

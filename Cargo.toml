@@ -15,5 +15,5 @@ primitive = { workspace = true }
 thiserror = "2"
 
 [workspace.dependencies]
-primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.51" }
+primitive = { git = "https://github.com/Banyc/primitive.git", tag = "v0.0.53" }
 statistical_inference = { git = "https://github.com/Banyc/statistical_inference.git", tag = "v0.0.4" }
